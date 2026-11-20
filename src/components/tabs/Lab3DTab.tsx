@@ -1845,6 +1845,7 @@ export function Lab3DTab({
           }}
           onUninstallItem={handleUninstallItem}
           onDockHeightChange={setDockHeightPx}
+          onNotify={onNotify}
           psuVoltage={psuVoltage}
           onChangePsuVoltage={setPsuVoltage}
           isPoweredOn={isPoweredOn}
