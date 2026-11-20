@@ -1,0 +1,8 @@
+{
+  "name": "RigBench — PC Architecture & HW-SW Practicum Lab",
+  "description": "Laboratorium interaktif arsitektur PC, simulasi 3D motherboard PBR 24 titik & C-Panel, kuliah teater 7 klaster STMIK AKI, simulasi instalasi OS & Disk Management, serta Try Out TTS Essay 70% : ABC 30% dengan Rubric Matcher lokal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

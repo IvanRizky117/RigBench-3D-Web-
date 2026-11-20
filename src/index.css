@@ -1,0 +1,260 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-canvas: #02050C;
+  --color-surface: #070D1B;
+  --color-elevated: #0B1429;
+  --color-accent: #2563EB;
+  --color-highlight: #38BDF8;
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    background-color: #02050C;
+    color: #F8FAFC;
+    scroll-behavior: smooth;
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: #02050C;
+    color: #F8FAFC;
+    letter-spacing: 0.005em;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+
+  code, pre, .font-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Ultra-Dark Cinematic DataCore Sapphire Glass Surface */
+.datacore-card,
+.workbench-card {
+  background: linear-gradient(180deg, rgba(8, 15, 31, 0.86) 0%, rgba(4, 8, 18, 0.94) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  box-shadow:
+    inset 0 1px 0 0 rgba(147, 197, 253, 0.13),
+    0 20px 50px -24px rgba(0, 0, 0, 0.9);
+  transition:
+    border-color 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.datacore-card-interactive:hover {
+  border-color: rgba(56, 189, 248, 0.42);
+  box-shadow:
+    inset 0 1px 0 0 rgba(147, 197, 253, 0.24),
+    0 22px 54px -20px rgba(37, 99, 235, 0.36);
+}
+
+.workbench-elevated {
+  background-color: #091224;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  box-shadow: inset 0 1px 0 0 rgba(147, 197, 253, 0.12);
+}
+
+/* Primary Royal Sapphire CTA with Cinematic Ambient Glow */
+.sapphire-btn {
+  background: linear-gradient(180deg, #3B82F6 0%, #2563EB 100%);
+  color: #FFFFFF;
+  border: 1px solid rgba(147, 197, 253, 0.35);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
+    0 0 28px rgba(37, 99, 235, 0.44);
+  transition:
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sapphire-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.3),
+    0 0 38px rgba(56, 189, 248, 0.5);
+}
+
+.sapphire-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Smooth Shiny Cyan-Blue Gradient Headline (Clean, Zero SVG Filter Box) */
+@keyframes shiny-cyan-sweep {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.shiny-gradient-headline {
+  background-image: linear-gradient(110deg, #60a5fa 0%, #38bdf8 28%, #bae6fd 52%, #3b82f6 78%, #60a5fa 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shiny-cyan-sweep 9s ease-in-out infinite;
+}
+
+/* Custom Obsidian-Navy PillNav Accent Integration */
+.rigbench-pill-nav {
+  --pn-edge: rgba(59, 130, 246, 0.24) !important;
+  --pn-rim: rgba(147, 197, 253, 0.14) !important;
+  --pn-tile: linear-gradient(180deg, rgba(14, 24, 48, 0.9) 0%, rgba(7, 13, 27, 0.96) 100%) !important;
+  --pn-tile-rim:
+    inset 0 0 0 1px rgba(59, 130, 246, 0.16),
+    inset 0 1px 0 rgba(147, 197, 253, 0.12),
+    0 4px 12px -4px rgba(0, 0, 0, 0.78) !important;
+  --pn-dot: #38bdf8 !important;
+  --pn-shadow: 0 20px 44px -18px rgba(0, 0, 0, 0.92), 0 0 26px -12px rgba(37, 99, 235, 0.35) !important;
+}
+
+.press-feedback {
+  transition:
+    transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.press-feedback:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Cinema Subtitle Clean Text Shadow */
+.cinema-subtitle-text {
+  text-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.95),
+    0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+/* Mobile Bottom Dock Lightweight Glass Layer */
+.mobile-bottom-dock {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* GPU-Only Theater Stage Animations */
+@keyframes theater-aurora-breathe {
+  0%, 100% {
+    opacity: 0.72;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate3d(0, -6px, 0) scale(1.03);
+  }
+}
+
+.theater-aurora-breathe {
+  animation: theater-aurora-breathe 8s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes theater-particle-float {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translate3d(0, -14px, 0);
+    opacity: 0.85;
+  }
+}
+
+.theater-particle-float {
+  animation-name: theater-particle-float;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes theater-flow-dash {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+.theater-flow-dash {
+  animation: theater-flow-dash 1.35s linear infinite;
+}
+
+@keyframes theater-cue-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.theater-cue-enter {
+  animation: theater-cue-enter 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Budget Android (Infinix-class Mali/PowerVR) Compositor Optimization:
+   Preserve obsidian sapphire design while lowering expensive full-screen blur radius */
+@media (max-width: 767px) {
+  .datacore-card,
+  .workbench-card {
+    background: linear-gradient(180deg, rgba(8, 15, 31, 0.94) 0%, rgba(4, 8, 18, 0.97) 100%);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .mobile-bottom-dock {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+}
+
+/* Custom Sleek Obsidian Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: #02050C;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #13203A;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2563EB;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

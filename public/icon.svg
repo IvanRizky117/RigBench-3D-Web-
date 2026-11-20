@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#071127" />
+      <stop offset="55%" stop-color="#030816" />
+      <stop offset="100%" stop-color="#02050C" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="46%" r="52%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.34" />
+      <stop offset="58%" stop-color="#2563EB" stop-opacity="0.14" />
+      <stop offset="100%" stop-color="#02050C" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="chip" x1="146" y1="146" x2="366" y2="366" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="55%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <rect width="512" height="512" rx="112" fill="url(#glow)" />
+  <rect x="20" y="20" width="472" height="472" rx="96" stroke="#3B82F6" stroke-opacity="0.28" stroke-width="4" />
+
+  <!-- CPU Pins Top / Bottom / Left / Right -->
+  <g stroke="#38BDF8" stroke-width="14" stroke-linecap="round">
+    <line x1="184" y1="96" x2="184" y2="142" />
+    <line x1="256" y1="96" x2="256" y2="142" />
+    <line x1="328" y1="96" x2="328" y2="142" />
+    <line x1="184" y1="370" x2="184" y2="416" />
+    <line x1="256" y1="370" x2="256" y2="416" />
+    <line x1="328" y1="370" x2="328" y2="416" />
+    <line x1="96" y1="184" x2="142" y2="184" />
+    <line x1="96" y1="256" x2="142" y2="256" />
+    <line x1="96" y1="328" x2="142" y2="328" />
+    <line x1="370" y1="184" x2="416" y2="184" />
+    <line x1="370" y1="256" x2="416" y2="256" />
+    <line x1="370" y1="328" x2="416" y2="328" />
+  </g>
+
+  <!-- Outer Substrate -->
+  <rect x="142" y="142" width="228" height="228" rx="34" fill="#08152E" stroke="url(#chip)" stroke-width="14" />
+
+  <!-- Inner Core Die -->
+  <rect x="196" y="196" width="120" height="120" rx="18" fill="url(#chip)" fill-opacity="0.24" stroke="#7DD3FC" stroke-width="8" />
+  <circle cx="256" cy="256" r="24" fill="#38BDF8" />
+  <path d="M168 340 L186 340 L168 322 Z" fill="#F59E0B" />
+</svg>

@@ -1,0 +1,22 @@
+title = "RigBench Gitleaks Secret Guard"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow safe public URLs, example placeholders, and lockfiles"
+paths = [
+  '''^\.env\.example$''',
+  '''^bun\.lock$''',
+  '''^package-lock\.json$''',
+  '''^AEGIS_AUDIT_REPORT\.md$''',
+  '''^public/assets/aistudio/.*$''',
+]
+regexes = [
+  '''https://fonts\.googleapis\.com/.*''',
+  '''https://fonts\.gstatic\.com/.*''',
+  '''https://[a-z0-9-]+\.cloudfront\.net/.*''',
+  '''MY_GEMINI_API_KEY''',
+  '''MY_APP_URL''',
+  '''AKILB-2025X-STMIK-HWSW7-LEGAL''',
+]
