@@ -41,6 +41,7 @@ import type {
 import { labSfx } from '../../utils/sfxAudio';
 import { MAX_GLB_FILE_BYTES, verifyGlbBinaryHeader } from '../../utils/inputSanitizer';
 import {
+  isTouchPrimaryDevice,
   loadGraphicsQualityMode,
   resolveRenderProfile,
   saveGraphicsQualityMode,
@@ -56,6 +57,7 @@ import { OptionalGlbErrorBoundary } from '../3d/OptionalGlbLoader';
 import { InspectPopupCard } from './lab3d/InspectPopupCard';
 import { AssemblyBottomDock } from './lab3d/AssemblyBottomDock';
 import { AssemblyPostReportModal } from './lab3d/AssemblyPostReportModal';
+import { TouchRotateFloatingPill } from './lab3d/TouchRotateFloatingPill';
 
 interface Lab3DTabProps {
   initialComponentId: string | null;
@@ -271,10 +273,14 @@ export function Lab3DTab({
 
   const [selectedItemId, setSelectedItemId] = useState<AssemblyStepId | null>('open-cpu-lever');
   const [draggingItemId, setDraggingItemId] = useState<AssemblyStepId | null>(null);
-  const [dragInitialClientPos, setDragInitialClientPos] = useState<{ x: number; y: number } | null>(
-    null
-  );
+  const [dragInitialClientPos, setDragInitialClientPos] = useState<{
+    x: number;
+    y: number;
+    pointerId?: number;
+  } | null>(null);
   const [rotationStep, setRotationStep] = useState<number>(0);
+  const [dockHeightPx, setDockHeightPx] = useState<number>(190);
+  const [isTouchInput, setIsTouchInput] = useState<boolean>(() => isTouchPrimaryDevice());
   const [dragFeedback, setDragFeedback] = useState<{
     socketId: string | null;
     state: DragTintState;
@@ -303,7 +309,10 @@ export function Lab3DTab({
   }, [initialComponentId, onClearInitialComponent, onInspectComponent]);
 
   useEffect(() => {
+    const syncTouch = () => setIsTouchInput(isTouchPrimaryDevice());
+    window.addEventListener('resize', syncTouch);
     return () => {
+      window.removeEventListener('resize', syncTouch);
       labSfx.stopFanHum();
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
@@ -375,6 +384,14 @@ export function Lab3DTab({
     if (!activeHeldId) return true;
     return isPartOrientationValid(activeHeldId, rotationStep);
   }, [activeHeldId, rotationStep]);
+
+  const canRotateActive = useMemo(
+    () =>
+      mode === 'assemble' &&
+      needsPartRotation(activeHeldId) &&
+      (difficulty === 'freeroam' || !allPartsInstalled),
+    [mode, activeHeldId, difficulty, allPartsInstalled]
+  );
 
   // Adaptive Practice target socket / pin indicator across ALL 22 steps
   const practiceGuideSocketId = useMemo(() => {
@@ -520,10 +537,10 @@ export function Lab3DTab({
   );
 
   const handleStartDragItem = useCallback(
-    (id: AssemblyStepId, clientX: number, clientY: number) => {
+    (id: AssemblyStepId, clientX: number, clientY: number, pointerId?: number) => {
       setSelectedItemId(id);
       setRotationStep((prev) => (selectedItemId === id ? prev : getInitialRotationForPart(id)));
-      setDragInitialClientPos({ x: clientX, y: clientY });
+      setDragInitialClientPos({ x: clientX, y: clientY, pointerId });
       setDraggingItemId(id);
     },
     [selectedItemId]
@@ -743,7 +760,11 @@ export function Lab3DTab({
           `Kabel HDD LED salah colok di ${FPANEL_ZONE_LABELS[hddLedAssign.zoneId]} (seharusnya Blok Oranye Pin 1–3)!`
         );
       } else if (!hddLedAssign.polarityValid) {
-        issues.push('Polaritas (+)/(-) kabel HDD LED terbalik — tekan [R] sebelum memasang agar LED menyala!');
+        issues.push(
+          isTouchInput
+            ? 'Polaritas (+)/(-) kabel HDD LED terbalik — ketuk tombol Putar sebelum memasang agar LED menyala!'
+            : 'Polaritas (+)/(-) kabel HDD LED terbalik — tekan [R] sebelum memasang agar LED menyala!'
+        );
       }
     }
 
@@ -787,6 +808,7 @@ export function Lab3DTab({
     hddJumperColumn,
     ideEndsConnected,
     fPanelWiring,
+    isTouchInput,
   ]);
 
   const handleTriggerPowerTest = useCallback(() => {
@@ -1056,7 +1078,9 @@ export function Lab3DTab({
             labSfx.playRuleWarning();
             onNotify(
               'Garis Merah Pin-1 IDE Terbalik!',
-              'Tekan tombol [R] hingga garis merah Pin-1 pada kabel pita IDE sejajar sisi Pin-1 soket!',
+              isTouchInput
+                ? 'Ketuk tombol Putar kanan (atau tap 2 jari) hingga garis merah Pin-1 sejajar sisi Pin-1 soket!'
+                : 'Tekan tombol [R] hingga garis merah Pin-1 pada kabel pita IDE sejajar sisi Pin-1 soket!',
               'warning'
             );
             return;
@@ -1131,7 +1155,9 @@ export function Lab3DTab({
             labSfx.playRuleWarning();
             onNotify(
               'Polaritas LED Terbalik!',
-              'Tekan tombol [R] (atau tombol Balik Polaritas di Bottom Bar) hingga kutub (+)/(-) sejajar!',
+              isTouchInput
+                ? 'Ketuk tombol Putar kanan (atau tap 2 jari) hingga kutub (+)/(-) sejajar!'
+                : 'Tekan tombol [R] (atau tombol Balik Polaritas di Bottom Bar) hingga kutub (+)/(-) sejajar!',
               'warning'
             );
             return;
@@ -1180,8 +1206,12 @@ export function Lab3DTab({
         onNotify(
           itemId === 'install-cpu' ? 'Orientasi Segitiga CPU Belum Cocok' : 'Celah Notch RAM Terbalik',
           itemId === 'install-cpu'
-            ? 'Tekan tombol [R] hingga panah segitiga emas sejajar sudut Pin-1 soket LGA 775!'
-            : 'Tekan tombol [R] hingga panah notch DDR2 sejajar dengan tonjolan slot DIMM!',
+            ? isTouchInput
+              ? 'Ketuk tombol Putar kanan (atau tap 2 jari) hingga panah segitiga emas sejajar sudut Pin-1 soket LGA 775!'
+              : 'Tekan tombol [R] hingga panah segitiga emas sejajar sudut Pin-1 soket LGA 775!'
+            : isTouchInput
+              ? 'Ketuk tombol Putar kanan (atau tap 2 jari) hingga panah notch DDR2 sejajar tonjolan slot DIMM!'
+              : 'Tekan tombol [R] hingga panah notch DDR2 sejajar dengan tonjolan slot DIMM!',
           'warning'
         );
         return;
@@ -1207,6 +1237,7 @@ export function Lab3DTab({
       fPanelWiring,
       heatsinkPinsLocked,
       ideEndsConnected,
+      isTouchInput,
       nextRequiredStep,
       onNotify,
     ]
@@ -1264,7 +1295,12 @@ export function Lab3DTab({
           };
         }
         if (!ideEndsConnected.board && !isPartOrientationValid(itemId, rot)) {
-          return { state: 'invalid', reason: 'Garis merah Pin-1 IDE terbalik — tekan [R]!' };
+          return {
+            state: 'invalid',
+            reason: isTouchInput
+              ? 'Garis merah Pin-1 IDE terbalik — tap 2 jari atau ketuk Putar!'
+              : 'Garis merah Pin-1 IDE terbalik — tekan [R]!',
+          };
         }
         return {
           state: 'valid',
@@ -1290,7 +1326,12 @@ export function Lab3DTab({
             return { state: 'invalid', reason: `Salah blok warna! Anda menunjuk ${FPANEL_ZONE_LABELS[socketId]}` };
           }
           if (!isPartOrientationValid(itemId, rot)) {
-            return { state: 'invalid', reason: 'Polaritas LED terbalik — tekan [R] untuk membalik (+)/(-)!' };
+            return {
+              state: 'invalid',
+              reason: isTouchInput
+                ? 'Polaritas LED terbalik — tap 2 jari atau ketuk Putar!'
+                : 'Polaritas LED terbalik — tekan [R] untuk membalik (+)/(-)!'
+            };
           }
           return { state: 'valid', reason: `${FPANEL_ZONE_LABELS[socketId]} presisi — lepas untuk menancapkan!` };
         }
@@ -1309,12 +1350,19 @@ export function Lab3DTab({
       if (!isPartOrientationValid(itemId, rot)) {
         return {
           state: 'invalid',
-          reason: 'Orientasi belum sejajar — tekan tombol [R] untuk memutar!',
+          reason: isTouchInput
+            ? 'Orientasi belum sejajar — tap 2 jari atau ketuk Putar!'
+            : 'Orientasi belum sejajar — tekan tombol [R] untuk memutar!',
         };
       }
-      return { state: 'valid', reason: 'Posisi presisi — lepas mouse untuk memasang!' };
+      return {
+        state: 'valid',
+        reason: isTouchInput
+          ? 'Posisi presisi — lepas jari untuk memasang!'
+          : 'Posisi presisi — lepas mouse untuk memasang!',
+      };
     },
-    [difficulty, fPanelWiring, heatsinkPinsLocked, ideEndsConnected, nextRequiredStep]
+    [difficulty, fPanelWiring, heatsinkPinsLocked, ideEndsConnected, isTouchInput, nextRequiredStep]
   );
 
   // Direct 3D Socket / Pin / Fastener Click Handler
@@ -1477,7 +1525,7 @@ export function Lab3DTab({
   };
 
   return (
-    <div className="fixed inset-0 z-50 h-screen w-screen overflow-hidden bg-[#0B0E14]">
+    <div className="fixed inset-0 z-50 h-[100dvh] w-full overflow-hidden bg-[#0B0E14]">
       {/* 100% Fullscreen 3D Viewport */}
       <OptionalGlbErrorBoundary
         onResetToProcedural={() => {
@@ -1503,6 +1551,9 @@ export function Lab3DTab({
           dragInitialClientPos={dragInitialClientPos}
           dragRotationStep={rotationStep}
           isHeldPartAligned={isHeldPartAligned}
+          dockHeightPx={dockHeightPx}
+          canRotateActive={canRotateActive}
+          onRotateActivePart={handleRotatePart}
           evaluateDragTarget={evaluateDragTarget}
           onDropOnSocket={handleDropOnSocket}
           onCancelDrag={() => {
@@ -1527,8 +1578,8 @@ export function Lab3DTab({
         />
       </OptionalGlbErrorBoundary>
 
-      {/* Minimalist Floating Top HUD Bar (Zero backdrop-filter over WebGL, 360px friendly) */}
-      <div className="pointer-events-none absolute inset-x-2.5 sm:inset-x-3 top-2.5 z-30 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
+      {/* Minimalist Floating Top HUD Bar (Zero backdrop-filter over WebGL, 360px + safe-area friendly) */}
+      <div className="pointer-events-none absolute inset-x-2.5 sm:inset-x-3 top-[calc(0.625rem+env(safe-area-inset-top,0px))] z-30 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
         <button
           type="button"
           onClick={() => {
@@ -1705,7 +1756,7 @@ export function Lab3DTab({
       {/* Live Drag Snap Status Banner */}
       {draggingItemId && (
         <div
-          className={`pointer-events-none absolute top-14 left-1/2 z-30 -translate-x-1/2 rounded-lg border px-3.5 py-1.5 text-xs font-medium shadow-lg ${
+          className={`pointer-events-none absolute top-[calc(5.25rem+env(safe-area-inset-top,0px))] sm:top-14 left-1/2 z-30 w-max max-w-[calc(100vw-1.5rem)] -translate-x-1/2 rounded-lg border px-3 py-1.5 text-center text-[11px] sm:text-xs font-medium shadow-lg ${
             dragFeedback.state === 'valid'
               ? 'border-[#10B981]/60 bg-[#040812]/95 text-[#34D399]'
               : dragFeedback.state === 'invalid'
@@ -1714,7 +1765,9 @@ export function Lab3DTab({
           }`}
         >
           {dragFeedback.reason ??
-            'Seret ke atas soket/pin tujuan · Tekan [R] untuk memutar orientasi atau polaritas'}
+            (isTouchInput
+              ? 'Seret ke soket/pin tujuan · Tap 2 jari atau ketuk Putar kanan'
+              : 'Seret ke atas soket/pin tujuan · Tekan [R] untuk memutar orientasi atau polaritas')}
         </div>
       )}
 
@@ -1742,6 +1795,24 @@ export function Lab3DTab({
         />
       )}
 
+      {/* Mode 2 Floating Right Touch Rotate Pill + Cancel Drag Affordance */}
+      {mode === 'assemble' && (
+        <TouchRotateFloatingPill
+          activeHeldId={activeHeldId}
+          rotationStep={rotationStep}
+          isFreeRoam={difficulty === 'freeroam'}
+          allPartsInstalled={allPartsInstalled}
+          isDragging={Boolean(draggingItemId)}
+          isTouchInput={isTouchInput}
+          dockHeightPx={dockHeightPx}
+          onRotatePart={handleRotatePart}
+          onCancelDrag={() => {
+            setDraggingItemId(null);
+            setDragInitialClientPos(null);
+          }}
+        />
+      )}
+
       {/* Mode 2: Visual Hardware Component Cards & Hybrid 3D Drag-and-Drop Dock */}
       {mode === 'assemble' && (
         <AssemblyBottomDock
@@ -1763,11 +1834,17 @@ export function Lab3DTab({
           selectedItemId={selectedItemId}
           draggingItemId={draggingItemId}
           rotationStep={rotationStep}
+          isTouchInput={isTouchInput}
           onRotatePart={handleRotatePart}
           onFocusActiveTarget={handleFocusActiveTarget}
           onSelectItem={handleSelectInventoryItem}
           onStartDragItem={handleStartDragItem}
+          onCancelDrag={() => {
+            setDraggingItemId(null);
+            setDragInitialClientPos(null);
+          }}
           onUninstallItem={handleUninstallItem}
+          onDockHeightChange={setDockHeightPx}
           psuVoltage={psuVoltage}
           onChangePsuVoltage={setPsuVoltage}
           isPoweredOn={isPoweredOn}

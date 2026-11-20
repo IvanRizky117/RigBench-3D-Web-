@@ -190,7 +190,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('home')}
-                className="pointer-events-auto inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[#3B82F6]/20 bg-[#050B18]/88 px-3.5 py-2 backdrop-blur-md shadow-[0_12px_28px_-12px_rgba(0,0,0,0.9)] transition-colors hover:border-[#38BDF8]/45 whitespace-nowrap shrink-0 press-feedback"
+                className="glass-header-chip pointer-events-auto inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[#3B82F6]/20 bg-[#050B18]/88 px-3.5 py-2 backdrop-blur-md shadow-[0_12px_28px_-12px_rgba(0,0,0,0.9)] transition-colors hover:border-[#38BDF8]/45 whitespace-nowrap shrink-0 press-feedback"
               >
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#2563EB]/25 text-[#38BDF8]">
                   <Cpu size={15} weight="duotone" />

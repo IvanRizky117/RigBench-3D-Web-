@@ -12,6 +12,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        injectRegister: null,
         includeAssets: [
           'icon.svg',
           'apple-touch-icon.png',
@@ -55,8 +56,23 @@ export default defineConfig(() => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          globIgnores: [
+            '**/vendor-three*.js',
+            '**/FullMotherboardLabCanvas*.js',
+            '**/MiniMotherboardCanvas*.js',
+            '**/Lab3DTab*.js',
+          ],
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
           runtimeCaching: [
+            {
+              urlPattern: /\/assets\/.*\.(?:js|css)$/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'rigbench-lazy-modules',
+                expiration: {maxEntries: 32, maxAgeSeconds: 60 * 60 * 24 * 30},
+                cacheableResponse: {statuses: [0, 200]},
+              },
+            },
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'StaleWhileRevalidate',

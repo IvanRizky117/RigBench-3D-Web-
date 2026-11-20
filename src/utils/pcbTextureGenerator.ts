@@ -12,24 +12,33 @@ export interface ProceduralPcbMaps {
  * fine 45-degree copper traces, gold mounting standoffs, SMD footprints, crisp
  * white technical silkscreen, bump, and roughness maps (100% client-side, zero 404).
  */
-export function createProceduralPcbMaps(maxAnisotropy: number): ProceduralPcbMaps {
+export function createProceduralPcbMaps(
+  maxAnisotropy: number,
+  textureScale = 1
+): ProceduralPcbMaps {
   const width = 2048;
   const height = 1720;
+  const scale = Math.min(1, Math.max(0.5, textureScale));
+  const scaledW = Math.round(width * scale);
+  const scaledH = Math.round(height * scale);
 
   const albedoCanvas = document.createElement('canvas');
-  albedoCanvas.width = width;
-  albedoCanvas.height = height;
+  albedoCanvas.width = scaledW;
+  albedoCanvas.height = scaledH;
   const ctx = albedoCanvas.getContext('2d')!;
+  if (scale !== 1) ctx.scale(scale, scale);
 
   const bumpCanvas = document.createElement('canvas');
-  bumpCanvas.width = width;
-  bumpCanvas.height = height;
+  bumpCanvas.width = scaledW;
+  bumpCanvas.height = scaledH;
   const bCtx = bumpCanvas.getContext('2d')!;
+  if (scale !== 1) bCtx.scale(scale, scale);
 
   const roughCanvas = document.createElement('canvas');
-  roughCanvas.width = width;
-  roughCanvas.height = height;
+  roughCanvas.width = scaledW;
+  roughCanvas.height = scaledH;
   const rCtx = roughCanvas.getContext('2d')!;
+  if (scale !== 1) rCtx.scale(scale, scale);
 
   // 1. Deep midnight-indigo / obsidian PCB resin solder mask
   const bgGrad = ctx.createLinearGradient(0, 0, width, height);
@@ -351,12 +360,18 @@ export function createLga775PinGridTexture(maxAnisotropy: number): THREE.CanvasT
 /**
  * Generates an ESD Anti-Static Technician Workbench Mat texture with crisp metric grid lines.
  */
-export function createWorkbenchMatTexture(maxAnisotropy: number): THREE.CanvasTexture {
+export function createWorkbenchMatTexture(
+  maxAnisotropy: number,
+  textureScale = 1
+): THREE.CanvasTexture {
   const size = 1024;
+  const scale = Math.min(1, Math.max(0.5, textureScale));
+  const scaledSize = Math.round(size * scale);
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = scaledSize;
+  canvas.height = scaledSize;
   const ctx = canvas.getContext('2d')!;
+  if (scale !== 1) ctx.scale(scale, scale);
 
   ctx.fillStyle = '#0D121B';
   ctx.fillRect(0, 0, size, size);

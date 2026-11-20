@@ -37,7 +37,7 @@ export function LazyMiniMotherboard({ onOpenFullLab }: LazyMiniMotherboardProps)
           observer.disconnect();
         }
       },
-      { rootMargin: '220px 0px' }
+      { rootMargin: '40px 0px', threshold: 0.05 }
     );
     observer.observe(node);
     return () => observer.disconnect();

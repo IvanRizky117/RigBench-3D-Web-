@@ -44,10 +44,10 @@ export function HomeTab({
 
   return (
     <div className="relative overflow-x-clip pb-28 md:pb-16">
-      {/* Full-Viewport Centered Hero (2-Line Clean White + Smooth Cyan-Blue Gradient, Royal Sapphire CTA) */}
+      {/* Full-Viewport Centered Hero (Instant 0ms Visibility via CSS GPU Rise + Compositor Glint) */}
       <section
         ref={heroRef}
-        className="relative flex min-h-[82vh] sm:min-h-[88vh] flex-col items-center justify-center px-4 pb-16 pt-6 text-center sm:px-6 lg:px-8"
+        className="relative flex min-h-[calc(100svh-4.75rem)] sm:min-h-[88vh] flex-col items-center justify-center px-4 pb-[calc(5.25rem+env(safe-area-inset-bottom,0px))] sm:pb-16 pt-6 text-center sm:px-6 lg:px-8"
       >
         <motion.div
           className="mx-auto max-w-4xl will-change-transform"
@@ -61,31 +61,38 @@ export function HomeTab({
                 }
           }
         >
-          <motion.h1
-            initial={reducedMotion ? false : { opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, ease: SNAPPY_EASE }}
-            className="mx-auto max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.03em] sm:text-6xl lg:text-[64px]"
+          <h1
+            className={`mx-auto max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.03em] sm:text-6xl lg:text-[64px] ${
+              reducedMotion ? '' : 'hero-gpu-rise'
+            }`}
           >
             <span className="block text-[#F8FAFC]">Arsitektur PC.</span>
-            <span className="shiny-gradient-headline mt-1 inline-block">Tervisualisasi.</span>
-          </motion.h1>
+            <span className="relative mt-1 inline-block">
+              <span className="shiny-gradient-headline">Tervisualisasi.</span>
+              {!reducedMotion && (
+                <span
+                  aria-hidden="true"
+                  className="shiny-gradient-headline-glint pointer-events-none absolute inset-0 select-none"
+                >
+                  Tervisualisasi.
+                </span>
+              )}
+            </span>
+          </h1>
 
-          <motion.p
-            initial={reducedMotion ? false : { opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.08, ease: SNAPPY_EASE }}
-            className="mx-auto mt-6 max-w-xl text-sm leading-relaxed text-[#94A3B8] sm:text-base"
+          <p
+            className={`mx-auto mt-6 max-w-xl text-sm leading-relaxed text-[#94A3B8] sm:text-base ${
+              reducedMotion ? '' : 'hero-gpu-rise'
+            }`}
           >
             Platform interaktif Praktikum Hardware-Software STMIK AKI dengan teater visual, lab 3D
             motherboard, dan uji pemahaman otomatis.
-          </motion.p>
+          </p>
 
-          <motion.div
-            initial={reducedMotion ? false : { opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.16, ease: SNAPPY_EASE }}
-            className="mt-9 flex flex-wrap items-center justify-center gap-4"
+          <div
+            className={`mt-9 flex flex-wrap items-center justify-center gap-4 ${
+              reducedMotion ? '' : 'hero-gpu-rise'
+            }`}
           >
             <motion.button
               type="button"
@@ -110,18 +117,15 @@ export function HomeTab({
               <span>Eksplorasi Lab 3D</span>
               <ArrowRight size={14} weight="bold" />
             </motion.button>
-          </motion.div>
+          </div>
         </motion.div>
 
-        {/* Subtle Bottom Scroll Indicator */}
+        {/* Subtle Bottom Scroll Indicator (Clears Mobile Bottom Dock & Safe Area) */}
         <motion.button
           type="button"
           onClick={scrollToBento}
           style={reducedMotion ? undefined : { opacity: indicatorOpacity }}
-          initial={reducedMotion ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.55, delay: 0.28, ease: SNAPPY_EASE }}
-          className="group absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-[11px] font-medium tracking-wide text-[#64748B] hover:text-[#38BDF8] transition-colors focus:outline-none"
+          className="group absolute bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-[11px] font-medium tracking-wide text-[#64748B] hover:text-[#38BDF8] transition-colors focus:outline-none"
         >
           <span>Scroll untuk eksplorasi</span>
           <span className="relative h-8 w-[2px] overflow-hidden rounded-full bg-[#3B82F6]/20">

@@ -11,6 +11,7 @@ export interface ResolvedRenderProfile {
   shadowMapSize: 512 | 1024 | 2048;
   anisotropyCap: number;
   pinSyncIntervalMs: number;
+  textureScale: 0.5 | 0.75 | 1;
   label: string;
 }
 
@@ -18,6 +19,21 @@ const QUALITY_STORAGE_KEY = 'rigbench_graphics_quality_v1';
 
 const ENTRY_GPU_PATTERN =
   /Mali-G5[127]|Mali-G31|Mali-T|PowerVR|IMG|Adreno \(TM\) [345]\d\d|Adreno \(TM\) 61[0-9]|SwiftShader|llvmpipe|softpipe/i;
+
+export interface DetectedDeviceTier {
+  tier: DevicePerformanceTier;
+  isMobileViewport: boolean;
+  isLowEndMobile: boolean;
+}
+
+let cachedTierResult: DetectedDeviceTier | null = null;
+
+export function isTouchPrimaryDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  const coarse = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+  const hasTouch = (navigator.maxTouchPoints ?? 0) > 0;
+  return coarse || (hasTouch && window.innerWidth < 1024);
+}
 
 export function loadGraphicsQualityMode(): GraphicsQualityMode {
   if (typeof window === 'undefined') return 'auto';
@@ -42,20 +58,26 @@ export function saveGraphicsQualityMode(mode: GraphicsQualityMode): void {
 }
 
 /**
- * Probes GPU renderer string and hardware hints to classify devices such as
- * Infinix Hot/Smart/Note budget Android phones without degrading 3D model geometry.
+ * Probes GPU renderer string and hardware hints (cached once per session)
+ * to classify devices such as Infinix Hot/Smart/Note budget Android phones
+ * without degrading 3D model geometry.
  */
-export function detectDeviceTier(): {
-  tier: DevicePerformanceTier;
-  isMobileViewport: boolean;
-  isLowEndMobile: boolean;
-} {
+export function detectDeviceTier(): DetectedDeviceTier {
   if (typeof window === 'undefined') {
     return { tier: 'high', isMobileViewport: false, isLowEndMobile: false };
   }
 
-  const isCoarsePointer =
-    window.matchMedia?.('(pointer: coarse)').matches ?? false;
+  if (cachedTierResult) {
+    const isCoarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+    const isMobileViewport = window.innerWidth < 768 || isCoarsePointer;
+    return {
+      ...cachedTierResult,
+      isMobileViewport,
+      isLowEndMobile: cachedTierResult.tier === 'low' && isMobileViewport,
+    };
+  }
+
+  const isCoarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
   const isMobileViewport = window.innerWidth < 768 || isCoarsePointer;
   const cores = navigator.hardwareConcurrency ?? 8;
   const deviceMem =
@@ -81,13 +103,29 @@ export function detectDeviceTier(): {
   const isMemoryConstrained = deviceMem <= 4;
   const isCoreConstrained = cores <= 4;
 
+  let tier: DevicePerformanceTier = 'high';
   if (isEntryGpu || (isMobileViewport && (isMemoryConstrained || isCoreConstrained))) {
-    return { tier: 'low', isMobileViewport, isLowEndMobile: isMobileViewport };
+    tier = 'low';
+  } else if (isMobileViewport || deviceMem <= 6 || cores <= 6) {
+    tier = 'medium';
   }
-  if (isMobileViewport || deviceMem <= 6 || cores <= 6) {
-    return { tier: 'medium', isMobileViewport, isLowEndMobile: false };
-  }
-  return { tier: 'high', isMobileViewport, isLowEndMobile: false };
+
+  cachedTierResult = {
+    tier,
+    isMobileViewport,
+    isLowEndMobile: tier === 'low' && isMobileViewport,
+  };
+  return cachedTierResult;
+}
+
+/**
+ * Applies a lightweight CSS root class on low-tier entry GPUs so glass cards
+ * and bars swap expensive backdrop-filter blur for crisp opaque sapphire gradients.
+ */
+export function applyDeviceTierDomClass(): void {
+  if (typeof document === 'undefined') return;
+  const { tier } = detectDeviceTier();
+  document.documentElement.classList.toggle('gpu-low-tier', tier === 'low');
 }
 
 export function resolveRenderProfile(
@@ -107,6 +145,7 @@ export function resolveRenderProfile(
       shadowMapSize: 512,
       anisotropyCap: 2,
       pinSyncIntervalMs: 85,
+      textureScale: 0.5,
       label: 'Hemat (SW)',
     };
   }
@@ -125,6 +164,7 @@ export function resolveRenderProfile(
       shadowMapSize: 512,
       anisotropyCap: 2,
       pinSyncIntervalMs: 55,
+      textureScale: 0.5,
       label: mode === 'auto' ? 'Auto · Hemat' : 'Hemat',
     };
   }
@@ -140,6 +180,7 @@ export function resolveRenderProfile(
       shadowMapSize: 512,
       anisotropyCap: 4,
       pinSyncIntervalMs: 45,
+      textureScale: 0.75,
       label: mode === 'auto' ? 'Auto · Seimbang' : 'Seimbang',
     };
   }
@@ -154,6 +195,7 @@ export function resolveRenderProfile(
     shadowMapSize: isMobileViewport ? 1024 : 2048,
     anisotropyCap: 8,
     pinSyncIntervalMs: 32,
+    textureScale: 1,
     label: mode === 'auto' ? 'Auto · Ultra' : 'Ultra',
   };
 }

@@ -64,9 +64,12 @@ interface FullMotherboardLabCanvasProps {
   assembleFocusTarget: AssembleAutoFocusTarget;
   zoomPinNonce: number;
   draggingItemId: AssemblyStepId | null;
-  dragInitialClientPos: { x: number; y: number } | null;
+  dragInitialClientPos: { x: number; y: number; pointerId?: number } | null;
   dragRotationStep: number;
   isHeldPartAligned: boolean;
+  dockHeightPx?: number;
+  canRotateActive?: boolean;
+  onRotateActivePart?: () => void;
   evaluateDragTarget: (
     itemId: AssemblyStepId,
     socketId: string | null,
@@ -207,6 +210,9 @@ export function FullMotherboardLabCanvas({
   dragInitialClientPos,
   dragRotationStep,
   isHeldPartAligned,
+  dockHeightPx = 190,
+  canRotateActive = false,
+  onRotateActivePart,
   evaluateDragTarget,
   onDropOnSocket,
   onCancelDrag,
@@ -284,6 +290,9 @@ export function FullMotherboardLabCanvas({
   const onSocketClickRef = useRef(onSocketClickInAssemble);
   const onFallbackRef = useRef(onModelFallback);
   const onGlbLoadedRef = useRef(onGlbLoaded);
+  const dockHeightRef = useRef(dockHeightPx);
+  const canRotateActiveRef = useRef(canRotateActive);
+  const onRotateActivePartRef = useRef(onRotateActivePart);
 
   modeRef.current = mode;
   completedStepsRef.current = new Set(completedAssemblySteps);
@@ -308,8 +317,12 @@ export function FullMotherboardLabCanvas({
   onSocketClickRef.current = onSocketClickInAssemble;
   onFallbackRef.current = onModelFallback;
   onGlbLoadedRef.current = onGlbLoaded;
+  dockHeightRef.current = dockHeightPx;
+  canRotateActiveRef.current = canRotateActive;
+  onRotateActivePartRef.current = onRotateActivePart;
 
   const dragClientPosRef = useRef<{ x: number; y: number } | null>(null);
+  const primaryDragPointerIdRef = useRef<number | null>(null);
   const dragSnapSocketRef = useRef<string | null>(null);
 
   // Trigger precision rotate-settle + green glow pulse when CPU, RAM 1, or RAM 2 installs
@@ -420,7 +433,7 @@ export function FullMotherboardLabCanvas({
       renderer.capabilities.getMaxAnisotropy(),
       initialProfile.anisotropyCap
     );
-    const built = buildProceduralMotherboard(effectiveAnisotropy);
+    const built = buildProceduralMotherboard(effectiveAnisotropy, initialProfile.textureScale);
     builtRef.current = built;
     scene.add(built.rootGroup);
 
@@ -442,6 +455,9 @@ export function FullMotherboardLabCanvas({
     let pointerDownX = 0;
     let pointerDownY = 0;
     let lastMoveCheck = 0;
+    let lastEmptyTapTime = 0;
+    let lastEmptyTapX = 0;
+    let lastEmptyTapY = 0;
 
     const setPointerFromClient = (clientX: number, clientY: number) => {
       const rect = renderer.domElement.getBoundingClientRect();
@@ -481,12 +497,33 @@ export function FullMotherboardLabCanvas({
     const onPointerUp = (e: PointerEvent) => {
       if (draggingItemRef.current) return;
       const dist = Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY);
-      if (dist > 6) return;
+      if (dist > 8) return;
       setPointerFromClient(e.clientX, e.clientY);
       raycaster.setFromCamera(pointer, camera);
       const hits = raycaster.intersectObjects(built.hitboxes, false);
       const compId = pickBestHit(hits, modeRef.current === 'assemble');
-      if (!compId) return;
+      if (!compId) {
+        if (
+          modeRef.current === 'assemble' &&
+          canRotateActiveRef.current &&
+          onRotateActivePartRef.current
+        ) {
+          const now = performance.now();
+          if (
+            now - lastEmptyTapTime < 340 &&
+            Math.hypot(e.clientX - lastEmptyTapX, e.clientY - lastEmptyTapY) < 36
+          ) {
+            lastEmptyTapTime = 0;
+            onRotateActivePartRef.current();
+          } else {
+            lastEmptyTapTime = now;
+            lastEmptyTapX = e.clientX;
+            lastEmptyTapY = e.clientY;
+          }
+        }
+        return;
+      }
+      lastEmptyTapTime = 0;
       if (modeRef.current === 'assemble') {
         onSocketClickRef.current(compId);
       } else {
@@ -1009,23 +1046,35 @@ export function FullMotherboardLabCanvas({
           }
         }
 
-        // Practice Mode Floating Mini Arrow & Target Label Projection
+        // Practice Mode Floating Mini Arrow & Target Label Projection (clamped within 360px safe bounds)
         const activeLabel = practiceGuideLabelRef.current;
         if (isAssemble && guideAnchorValid && activeLabel && !draggingItemRef.current) {
           _proj.copy(guideAnchorPos).project(camera);
-          const inBounds = _proj.z < 1 && _proj.x >= -0.96 && _proj.x <= 0.96 && _proj.y >= -0.82 && _proj.y <= 0.92;
-          const nextX = ((_proj.x + 1) / 2) * w;
-          const nextY = (-(_proj.y - 1) / 2) * h;
+          const inFront =
+            _proj.z < 1 &&
+            _proj.x >= -1.05 &&
+            _proj.x <= 1.05 &&
+            _proj.y >= -1.05 &&
+            _proj.y <= 1.05 &&
+            w > 0 &&
+            h > 0;
+          const rawX = ((_proj.x + 1) / 2) * w;
+          const rawY = (-(_proj.y - 1) / 2) * h;
+          const marginX = Math.min(84, Math.max(48, w * 0.23));
+          const minY = 122;
+          const maxY = Math.max(minY + 12, h - dockHeightRef.current - 12);
+          const nextX = THREE.MathUtils.clamp(rawX, marginX, Math.max(marginX, w - marginX));
+          const nextY = THREE.MathUtils.clamp(rawY, minY, maxY);
           setGuideBadge((prev) => {
             if (
-              prev.visible === inBounds &&
+              prev.visible === inFront &&
               prev.label === activeLabel &&
               Math.abs(prev.x - nextX) < 1.5 &&
               Math.abs(prev.y - nextY) < 1.5
             ) {
               return prev;
             }
-            return { x: nextX, y: nextY, visible: inBounds, label: activeLabel };
+            return { x: nextX, y: nextY, visible: inFront, label: activeLabel };
           });
         } else {
           setGuideBadge((prev) => (prev.visible ? { ...prev, visible: false } : prev));
@@ -1135,26 +1184,65 @@ export function FullMotherboardLabCanvas({
     }
   }, [showPins, mode]);
 
-  // Window pointer tracking & OrbitControls lock while dragging a 3D component
+  // Window pointer tracking, 2-finger tap rotation during drag, dynamic dock drop-cancel & OrbitControls lock
   useEffect(() => {
     const controls = controlsRef.current;
     if (!draggingItemId) {
       dragClientPosRef.current = null;
+      primaryDragPointerIdRef.current = null;
       if (controls) controls.enabled = true;
       return;
     }
 
     if (controls) controls.enabled = false;
-    dragClientPosRef.current = dragInitialClientPos;
+    dragClientPosRef.current = dragInitialClientPos
+      ? { x: dragInitialClientPos.x, y: dragInitialClientPos.y }
+      : null;
+    primaryDragPointerIdRef.current = dragInitialClientPos?.pointerId ?? null;
+
+    const onWindowPointerDown = (e: PointerEvent) => {
+      if (primaryDragPointerIdRef.current === null) {
+        primaryDragPointerIdRef.current = e.pointerId;
+        return;
+      }
+      if (e.pointerId !== primaryDragPointerIdRef.current) {
+        const targetEl = e.target as HTMLElement | null;
+        if (targetEl?.closest('[data-rotate-pill="true"], [data-cancel-drag="true"], button')) {
+          return;
+        }
+        if (canRotateActiveRef.current) {
+          e.preventDefault();
+          onRotateActivePartRef.current?.();
+        }
+      }
+    };
 
     const onWindowMove = (e: PointerEvent) => {
+      if (
+        primaryDragPointerIdRef.current !== null &&
+        e.pointerId !== primaryDragPointerIdRef.current
+      ) {
+        return;
+      }
       dragClientPosRef.current = { x: e.clientX, y: e.clientY };
     };
 
     const onWindowUp = (e: PointerEvent) => {
-      const isOverDock = e.clientY > window.innerHeight - 195;
+      if (
+        primaryDragPointerIdRef.current !== null &&
+        e.pointerId !== primaryDragPointerIdRef.current
+      ) {
+        return;
+      }
+      const dockBoundaryY = window.innerHeight - Math.max(120, dockHeightRef.current + 14);
+      const hitCancelEl =
+        typeof document.elementFromPoint === 'function'
+          ? document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-cancel-drag="true"]')
+          : null;
+      const isOverDock = e.clientY > dockBoundaryY || Boolean(hitCancelEl);
       const targetSocket = dragSnapSocketRef.current;
       dragClientPosRef.current = null;
+      primaryDragPointerIdRef.current = null;
       if (controls) controls.enabled = true;
 
       if (!isOverDock && targetSocket) {
@@ -1164,14 +1252,17 @@ export function FullMotherboardLabCanvas({
       }
     };
 
+    window.addEventListener('pointerdown', onWindowPointerDown);
     window.addEventListener('pointermove', onWindowMove);
     window.addEventListener('pointerup', onWindowUp);
     window.addEventListener('pointercancel', onWindowUp);
 
     return () => {
+      window.removeEventListener('pointerdown', onWindowPointerDown);
       window.removeEventListener('pointermove', onWindowMove);
       window.removeEventListener('pointerup', onWindowUp);
       window.removeEventListener('pointercancel', onWindowUp);
+      primaryDragPointerIdRef.current = null;
       if (controls) controls.enabled = true;
     };
   }, [draggingItemId, dragInitialClientPos]);

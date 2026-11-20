@@ -92,7 +92,7 @@ export function MiniMotherboardCanvas({
     scene.add(rimLight);
 
     const maxAniso = Math.min(renderer.capabilities.getMaxAnisotropy(), profile.anisotropyCap);
-    const built = buildProceduralMotherboard(maxAniso);
+    const built = buildProceduralMotherboard(maxAniso, profile.textureScale);
     built.workbenchMesh.visible = false;
     built.dataFlow.group.visible = true;
     scene.add(built.rootGroup);

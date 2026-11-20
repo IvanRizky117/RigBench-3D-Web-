@@ -88,7 +88,10 @@ export function detectSoftwareWebGL(): boolean {
   }
 }
 
-export function buildProceduralMotherboard(maxAnisotropy: number): BuiltMotherboardScene {
+export function buildProceduralMotherboard(
+  maxAnisotropy: number,
+  textureScale = 1
+): BuiltMotherboardScene {
   const geometries: THREE.BufferGeometry[] = [];
   const materials: THREE.Material[] = [];
   const textures: THREE.Texture[] = [];
@@ -107,7 +110,7 @@ export function buildProceduralMotherboard(maxAnisotropy: number): BuiltMotherbo
   rootGroup.add(boardGroup);
 
   // 1. Anti-Static Workbench Mat
-  const matTex = createWorkbenchMatTexture(maxAnisotropy);
+  const matTex = createWorkbenchMatTexture(maxAnisotropy, textureScale);
   textures.push(matTex);
   const workbenchGeo = trackGeo(new THREE.BoxGeometry(20.5, 0.25, 15.2));
   const workbenchMat = trackMat(
@@ -122,8 +125,8 @@ export function buildProceduralMotherboard(maxAnisotropy: number): BuiltMotherbo
   workbenchMesh.receiveShadow = true;
   rootGroup.add(workbenchMesh);
 
-  // 2. Main PCB Substrate (2048x1720 PBR Maps + Clearcoat Resin Solder Mask)
-  const pcbMaps = createProceduralPcbMaps(maxAnisotropy);
+  // 2. Main PCB Substrate (Adaptive 1024..2048 PBR Maps + Clearcoat Resin Solder Mask)
+  const pcbMaps = createProceduralPcbMaps(maxAnisotropy, textureScale);
   const pcbGeo = trackGeo(new THREE.BoxGeometry(10.0, 0.16, 8.4));
   const pcbTopMat = trackMat(
     new THREE.MeshPhysicalMaterial({

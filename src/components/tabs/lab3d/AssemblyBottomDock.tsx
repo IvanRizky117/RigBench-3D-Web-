@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowClockwise,
   ArrowCounterClockwise,
@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Trash,
   Warning,
+  X,
 } from '@phosphor-icons/react';
 import {
   FPANEL_STEP_BY_WIRE_KEY,
@@ -27,6 +28,7 @@ import type {
 } from '../../../types/rigbench';
 import { formatCountdown } from '../../../utils/formatters';
 import { HardwareCardArtwork } from './HardwareCardArtwork';
+import { getRotateToolMeta } from './TouchRotateFloatingPill';
 
 type DockCategoryFilter = 'all' | 'core' | 'storage' | 'c-panel';
 
@@ -40,11 +42,19 @@ interface AssemblyBottomDockProps {
   selectedItemId: AssemblyStepId | null;
   draggingItemId: AssemblyStepId | null;
   rotationStep: number;
+  isTouchInput: boolean;
   onRotatePart: () => void;
   onFocusActiveTarget: () => void;
   onSelectItem: (id: AssemblyStepId) => void;
-  onStartDragItem: (id: AssemblyStepId, clientX: number, clientY: number) => void;
+  onStartDragItem: (
+    id: AssemblyStepId,
+    clientX: number,
+    clientY: number,
+    pointerId?: number
+  ) => void;
+  onCancelDrag: () => void;
   onUninstallItem: (id: AssemblyStepId) => void;
+  onDockHeightChange?: (heightPx: number) => void;
   psuVoltage: '115V' | '220V';
   onChangePsuVoltage: (v: '115V' | '220V') => void;
   isPoweredOn: boolean;
@@ -81,52 +91,6 @@ function matchesCategory(
   return category === filter;
 }
 
-function getRotateToolMeta(
-  activeHeldId: AssemblyStepId | null,
-  rotationStep: number
-): { show: boolean; aligned: boolean; actionLabel: string; alignedLabel: string } {
-  if (!activeHeldId) {
-    return { show: false, aligned: true, actionLabel: '', alignedLabel: '' };
-  }
-  if (activeHeldId === 'install-cpu') {
-    return {
-      show: true,
-      aligned: rotationStep % 4 === 0,
-      actionLabel: 'Putar CPU',
-      alignedLabel: 'Pin-1 Sejajar',
-    };
-  }
-  if (activeHeldId === 'install-ram-1' || activeHeldId === 'install-ram-2') {
-    return {
-      show: true,
-      aligned: rotationStep % 2 === 0,
-      actionLabel: 'Putar RAM',
-      alignedLabel: 'Notch Sejajar',
-    };
-  }
-  if (activeHeldId === 'install-ide-cable') {
-    return {
-      show: true,
-      aligned: rotationStep % 2 === 0,
-      actionLabel: 'Balik Pin-1 IDE',
-      alignedLabel: 'Merah Pin-1 OK',
-    };
-  }
-  if (
-    activeHeldId === 'wire-hdd-led' ||
-    activeHeldId === 'wire-pled-pos' ||
-    activeHeldId === 'wire-pled-neg'
-  ) {
-    return {
-      show: true,
-      aligned: rotationStep % 2 === 0,
-      actionLabel: 'Balik Polaritas (+/-)',
-      alignedLabel: 'Polaritas (+) OK',
-    };
-  }
-  return { show: false, aligned: true, actionLabel: '', alignedLabel: '' };
-}
-
 export function AssemblyBottomDock({
   difficulty,
   onChangeDifficulty,
@@ -137,11 +101,14 @@ export function AssemblyBottomDock({
   selectedItemId,
   draggingItemId,
   rotationStep,
+  isTouchInput,
   onRotatePart,
   onFocusActiveTarget,
   onSelectItem,
   onStartDragItem,
+  onCancelDrag,
   onUninstallItem,
+  onDockHeightChange,
   psuVoltage,
   onChangePsuVoltage,
   isPoweredOn,
@@ -151,9 +118,34 @@ export function AssemblyBottomDock({
   mistakes,
   elapsedSeconds,
 }: AssemblyBottomDockProps) {
+  const dockRef = useRef<HTMLDivElement | null>(null);
   const scrollRailRef = useRef<HTMLDivElement | null>(null);
+  const onDockHeightChangeRef = useRef(onDockHeightChange);
+  onDockHeightChangeRef.current = onDockHeightChange;
+
   const [collapsed, setCollapsed] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<DockCategoryFilter>('all');
+
+  useEffect(() => {
+    const el = dockRef.current;
+    if (!el) return;
+
+    const reportHeight = () => {
+      const h = Math.round(el.getBoundingClientRect().height);
+      if (h > 0) {
+        onDockHeightChangeRef.current?.(h);
+      }
+    };
+
+    reportHeight();
+    const ro = new ResizeObserver(reportHeight);
+    ro.observe(el);
+    window.addEventListener('resize', reportHeight);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', reportHeight);
+    };
+  }, [collapsed]);
 
   const isFreeRoam = difficulty === 'freeroam';
   const isExam = difficulty === 'exam';
@@ -198,19 +190,21 @@ export function AssemblyBottomDock({
 
     const startX = e.clientX;
     const startY = e.clientY;
+    const startPointerId = e.pointerId;
     let dragStarted = false;
 
     const onMove = (ev: PointerEvent) => {
-      if (dragStarted) return;
+      if (dragStarted || ev.pointerId !== startPointerId) return;
       const dist = Math.hypot(ev.clientX - startX, ev.clientY - startY);
       if (dist > 8) {
         dragStarted = true;
         cleanup();
-        onStartDragItem(itemId, ev.clientX, ev.clientY);
+        onStartDragItem(itemId, ev.clientX, ev.clientY, startPointerId);
       }
     };
 
-    const onUp = () => {
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== startPointerId) return;
       cleanup();
       if (!dragStarted) {
         onSelectItem(itemId);
@@ -238,56 +232,90 @@ export function AssemblyBottomDock({
           : 'Set PSU 220V lalu tekan Power (atau klik tombol Power 3D di C-Panel).'
       : difficulty === 'practice' && nextRequiredStep
         ? nextRequiredStep.rulePrompt
-        : 'Mode Ujian TAS: Urutan ketat tanpa sorotan. Cek [R] orientasi/polaritas & cocokan warna pin F_PANEL!';
+        : isTouchInput
+          ? 'Mode Ujian TAS: Urutan ketat. Ketuk tombol Putar / 2-jari untuk orientasi & cocokkan warna pin F_PANEL!'
+          : 'Mode Ujian TAS: Urutan ketat tanpa sorotan. Cek [R] orientasi/polaritas & cocokan warna pin F_PANEL!';
 
   return (
-    <div className="absolute inset-x-3 bottom-2.5 z-30 rounded-xl border border-[#3B82F6]/25 bg-[#070E1F]/94 px-3 py-2 shadow-2xl space-y-1.5">
-      {/* Row 1: Stats, Rotate/Polarity Tool, Guidance, 3-Mode Switch, Reset & Collapse */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0 flex-1 flex items-center gap-2 text-[11px]">
-          <span className="shrink-0 font-mono font-semibold text-[#38BDF8] tabular-nums">
-            {isFreeRoam ? 'FREE' : 'TAS'} {completedSteps.length}/{totalSteps}
-          </span>
-          <span className="text-[#334155]">·</span>
-          <span className="shrink-0 font-mono text-[#CBD5E1] tabular-nums">
-            {formatCountdown(elapsedSeconds)}
-          </span>
-          {!isFreeRoam && (
-            <>
-              <span className="text-[#334155]">·</span>
-              <span
-                className={`shrink-0 font-mono font-medium tabular-nums ${
-                  mistakes === 0 ? 'text-[#10B981]' : 'text-[#F59E0B]'
-                }`}
-              >
-                Salah: {mistakes}
-              </span>
-            </>
-          )}
+    <div
+      ref={dockRef}
+      data-cancel-drag="true"
+      className="absolute inset-x-2 sm:inset-x-3 bottom-[calc(0.625rem+env(safe-area-inset-bottom,0px))] z-30 rounded-xl border border-[#3B82F6]/25 bg-[#070E1F]/95 px-2.5 sm:px-3 py-2 shadow-2xl space-y-1.5"
+    >
+      {/* Row 1: Clean 2-Row Split on 360px Mobile, Single-Row Bar on >= 640px */}
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+        {/* Sub-row 1A: Stats + Inline Rotate (Desktop) + Quick Controls on Mobile */}
+        <div className="min-w-0 flex-1 flex items-center justify-between sm:justify-start gap-2 text-[11px]">
+          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+            <span className="shrink-0 font-mono font-semibold text-[#38BDF8] tabular-nums">
+              {isFreeRoam ? 'FREE' : 'TAS'} {completedSteps.length}/{totalSteps}
+            </span>
+            <span className="text-[#334155]">·</span>
+            <span className="shrink-0 font-mono text-[#CBD5E1] tabular-nums">
+              {formatCountdown(elapsedSeconds)}
+            </span>
+            {!isFreeRoam && (
+              <>
+                <span className="text-[#334155]">·</span>
+                <span
+                  className={`shrink-0 font-mono font-medium tabular-nums ${
+                    mistakes === 0 ? 'text-[#10B981]' : 'text-[#F59E0B]'
+                  }`}
+                >
+                  Salah: {mistakes}
+                </span>
+              </>
+            )}
+          </div>
 
-          {/* Inline Rotate / Polarity [R] Tool for CPU, RAM, IDE Pin-1, and F_PANEL LEDs */}
+          {/* Mobile Compact Reset & Collapse on Row 1A Right */}
+          <div className="flex shrink-0 items-center gap-1 sm:hidden">
+            <button
+              type="button"
+              onClick={onResetAssembly}
+              title="Ulangi Perakitan"
+              aria-label="Ulangi Perakitan"
+              className="inline-flex h-7 items-center gap-1 rounded-lg border border-[#3B82F6]/20 bg-[#040812] px-2 text-[10px] font-medium text-[#94A3B8] hover:border-[#38BDF8]/40 hover:text-[#F8FAFC]"
+            >
+              <ArrowCounterClockwise size={12} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCollapsed((c) => !c)}
+              title={collapsed ? 'Tampilkan Kartu Komponen' : 'Perkecil Dock'}
+              aria-label={collapsed ? 'Tampilkan dock komponen' : 'Lipat dock komponen'}
+              className="inline-flex h-7 items-center gap-1 rounded-lg border border-[#3B82F6]/25 bg-[#0A162D] px-2 text-[10px] font-medium text-[#38BDF8] hover:border-[#38BDF8]/60"
+            >
+              {collapsed ? <CaretUp size={12} weight="bold" /> : <CaretDown size={12} weight="bold" />}
+              <span>{collapsed ? 'Buka' : 'Lipat'}</span>
+            </button>
+          </div>
+
+          {/* Inline Rotate / Polarity Tool (Desktop/Tablet inline; mobile uses floating right pill) */}
           {rotateMeta.show && (isFreeRoam || !allPartsInstalled) && (
             <button
               type="button"
               onClick={onRotatePart}
-              className={`shrink-0 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[10px] font-semibold transition-colors ${
+              className={`hidden sm:inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[10px] font-semibold transition-colors ${
                 rotateMeta.aligned
                   ? 'border-[#10B981]/50 bg-[#10B981]/15 text-[#34D399]'
                   : 'border-[#F59E0B]/60 bg-[#F59E0B]/15 text-[#FDE68A]'
               }`}
             >
               <ArrowClockwise size={11} weight="bold" />
-              [R] {rotateMeta.aligned ? rotateMeta.alignedLabel : rotateMeta.actionLabel}
+              {isTouchInput ? '' : '[R] '}
+              {rotateMeta.aligned ? rotateMeta.alignedLabel : rotateMeta.actionLabel}
             </button>
           )}
 
-          {/* Quick Focus Camera on Active Target (Practice Mode Only) */}
+          {/* Quick Focus Camera on Active Target (Desktop inline) */}
           {difficulty === 'practice' && !allPartsInstalled && (
             <button
               type="button"
               onClick={onFocusActiveTarget}
               title="Arahkan kamera langsung ke lokasi pemasangan langkah aktif"
-              className="shrink-0 inline-flex items-center gap-1 rounded-md border border-[#38BDF8]/45 bg-[#0A1D3A] px-2 py-0.5 font-mono text-[10px] font-semibold text-[#38BDF8] transition-colors hover:border-[#38BDF8] hover:bg-[#102A52]"
+              className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-md border border-[#38BDF8]/45 bg-[#0A1D3A] px-2 py-0.5 font-mono text-[10px] font-semibold text-[#38BDF8] transition-colors hover:border-[#38BDF8] hover:bg-[#102A52]"
             >
               <Crosshair size={11} weight="bold" />
               Fokus Target
@@ -303,13 +331,13 @@ export function AssemblyBottomDock({
           </span>
         </div>
 
-        {/* 3-Mode Switcher (Latihan | Ujian | Free Roam), Reset & Collapse */}
-        <div className="flex shrink-0 items-center gap-1.5">
-          <div className="inline-flex rounded-lg border border-[#3B82F6]/20 bg-[#040812] p-0.5 text-[10px]">
+        {/* Sub-row 1B: 3-Mode Switcher + Mobile Fokus/Batal Drag + Desktop Reset/Collapse */}
+        <div className="flex shrink-0 items-center justify-between sm:justify-end gap-1.5">
+          <div className="inline-flex shrink-0 rounded-lg border border-[#3B82F6]/20 bg-[#040812] p-0.5 text-[10px]">
             <button
               type="button"
               onClick={() => onChangeDifficulty('practice')}
-              className={`rounded-md px-2 py-0.5 font-medium transition-colors ${
+              className={`whitespace-nowrap rounded-md px-2 py-0.5 font-medium transition-colors ${
                 difficulty === 'practice'
                   ? 'bg-[#2563EB] text-white'
                   : 'text-[#94A3B8] hover:text-[#F8FAFC]'
@@ -320,7 +348,7 @@ export function AssemblyBottomDock({
             <button
               type="button"
               onClick={() => onChangeDifficulty('exam')}
-              className={`rounded-md px-2 py-0.5 font-medium transition-colors ${
+              className={`whitespace-nowrap rounded-md px-2 py-0.5 font-medium transition-colors ${
                 difficulty === 'exam'
                   ? 'bg-[#F59E0B] text-[#040812] font-semibold'
                   : 'text-[#94A3B8] hover:text-[#F8FAFC]'
@@ -331,7 +359,7 @@ export function AssemblyBottomDock({
             <button
               type="button"
               onClick={() => onChangeDifficulty('freeroam')}
-              className={`rounded-md px-2 py-0.5 font-medium transition-colors ${
+              className={`whitespace-nowrap rounded-md px-2 py-0.5 font-medium transition-colors ${
                 difficulty === 'freeroam'
                   ? 'bg-[#10B981] text-[#040812] font-semibold'
                   : 'text-[#94A3B8] hover:text-[#F8FAFC]'
@@ -341,14 +369,42 @@ export function AssemblyBottomDock({
             </button>
           </div>
 
+          {/* Mobile Quick Action: Cancel Drag when dragging, else Fokus Target */}
+          <div className="flex shrink-0 items-center gap-1 sm:hidden">
+            {draggingItemId ? (
+              <button
+                type="button"
+                onClick={onCancelDrag}
+                className="inline-flex items-center gap-1 rounded-md border border-[#F43F5E]/60 bg-[#1B0912] px-2 py-1 font-mono text-[10px] font-semibold text-[#FDA4AF]"
+              >
+                <X size={11} weight="bold" />
+                Batal
+              </button>
+            ) : (
+              difficulty === 'practice' &&
+              !allPartsInstalled && (
+                <button
+                  type="button"
+                  onClick={onFocusActiveTarget}
+                  title="Arahkan kamera ke target aktif"
+                  className="inline-flex items-center gap-1 rounded-md border border-[#38BDF8]/45 bg-[#0A1D3A] px-2 py-1 font-mono text-[10px] font-semibold text-[#38BDF8]"
+                >
+                  <Crosshair size={11} weight="bold" />
+                  Fokus
+                </button>
+              )
+            )}
+          </div>
+
+          {/* Desktop Reset & Collapse */}
           <button
             type="button"
             onClick={onResetAssembly}
             title="Ulangi Perakitan"
-            className="inline-flex items-center gap-1 rounded-lg border border-[#3B82F6]/20 bg-[#040812] px-2 py-1 text-[10px] font-medium text-[#94A3B8] hover:border-[#38BDF8]/40 hover:text-[#F8FAFC]"
+            className="hidden sm:inline-flex items-center gap-1 rounded-lg border border-[#3B82F6]/20 bg-[#040812] px-2 py-1 text-[10px] font-medium text-[#94A3B8] hover:border-[#38BDF8]/40 hover:text-[#F8FAFC]"
           >
             <ArrowCounterClockwise size={12} />
-            <span className="hidden sm:inline">Ulangi</span>
+            <span>Ulangi</span>
           </button>
 
           <button
@@ -356,7 +412,7 @@ export function AssemblyBottomDock({
             onClick={() => setCollapsed((c) => !c)}
             title={collapsed ? 'Tampilkan Kartu Komponen' : 'Perkecil Dock'}
             aria-label={collapsed ? 'Tampilkan dock komponen' : 'Lipat dock komponen'}
-            className="inline-flex items-center gap-1 rounded-lg border border-[#3B82F6]/25 bg-[#0A162D] px-2 py-1 text-[10px] font-medium text-[#38BDF8] hover:border-[#38BDF8]/60"
+            className="hidden sm:inline-flex items-center gap-1 rounded-lg border border-[#3B82F6]/25 bg-[#0A162D] px-2 py-1 text-[10px] font-medium text-[#38BDF8] hover:border-[#38BDF8]/60"
           >
             {collapsed ? <CaretUp size={12} weight="bold" /> : <CaretDown size={12} weight="bold" />}
             <span>{collapsed ? 'Buka' : 'Lipat'}</span>
@@ -370,7 +426,7 @@ export function AssemblyBottomDock({
           {/* Compact Category Filter Row + Free Roam Anytime Power Test Controls */}
           {(isFreeRoam || !allPartsInstalled) && (
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="inline-flex items-center gap-1 rounded-lg border border-[#3B82F6]/15 bg-[#040812] p-0.5 text-[10px]">
+              <div className="flex w-full sm:w-auto items-center gap-1 overflow-x-auto rounded-lg border border-[#3B82F6]/15 bg-[#040812] p-0.5 text-[10px]">
                 {CATEGORY_TABS.map((tab) => {
                   const catItems = STRICT_ASSEMBLY_ITEMS.filter((it) =>
                     matchesCategory(it.category, tab.id)
@@ -382,7 +438,7 @@ export function AssemblyBottomDock({
                       key={tab.id}
                       type="button"
                       onClick={() => handleChangeFilter(tab.id)}
-                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-medium transition-colors ${
+                      className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-medium transition-colors ${
                         active
                           ? 'bg-[#2563EB]/30 text-[#38BDF8] border border-[#38BDF8]/35'
                           : 'text-[#94A3B8] hover:text-[#F8FAFC] border border-transparent'
@@ -631,7 +687,9 @@ export function AssemblyBottomDock({
                                 : isSelected
                                   ? 'AKTIF'
                                   : item.requiresRotation || item.requiresPolarity
-                                    ? '[R]'
+                                    ? isTouchInput
+                                      ? 'PUTAR'
+                                      : '[R]'
                                     : ''}
                           </span>
                         )}
