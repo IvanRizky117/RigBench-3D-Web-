@@ -253,8 +253,9 @@ export function TheaterStagePlayer({
                 aria-label="Pilih suara narasi lokal browser"
                 value={speech.selectedVoiceUri}
                 onChange={(e) => speech.setSelectedVoiceUri(e.target.value)}
-                className="min-h-[38px] max-w-[138px] sm:max-w-[180px] truncate rounded-lg border border-[#3B82F6]/25 bg-[#040812] px-2 py-1 text-[11px] sm:text-xs text-[#E2E8F0] focus:border-[#38BDF8] focus:outline-none"
+                className="min-h-[38px] max-w-[146px] sm:max-w-[190px] truncate rounded-lg border border-[#3B82F6]/25 bg-[#040812] px-2 py-1 text-[11px] sm:text-xs text-[#E2E8F0] focus:border-[#38BDF8] focus:outline-none"
               >
+                <option value="">Default Sistem (id-ID)</option>
                 {speech.availableVoices.map((v) => (
                   <option key={v.voiceURI} value={v.voiceURI}>
                     {v.name} ({v.lang})
@@ -262,7 +263,7 @@ export function TheaterStagePlayer({
                 ))}
               </select>
             ) : (
-              <span className="font-mono text-[11px] truncate max-w-[130px]">{speech.voiceLabel}</span>
+              <span className="font-mono text-[11px] truncate max-w-[140px]">{speech.voiceLabel}</span>
             )}
 
             <button

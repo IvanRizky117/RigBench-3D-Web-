@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LectureSegment } from '../types/rigbench';
 import { buildSubtitleCues, computeCueSpeechMetrics } from '../utils/subtitleCues';
+import {
+  filterAndSortPreferredVoices,
+  isIndonesianVoice,
+  pickPreferredIndonesianVoice,
+} from '../utils/speechVoices';
 
 export type PlaybackSpeed = 1 | 1.25 | 1.5;
 
@@ -55,7 +60,7 @@ export function useSpeechLecture({
   const [speed, setSpeedState] = useState<PlaybackSpeed>(1);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [hasIndonesianVoice, setHasIndonesianVoice] = useState(true);
-  const [selectedVoiceUri, setSelectedVoiceUri] = useState<string>('');
+  const [selectedVoiceUri, setSelectedVoiceUriState] = useState<string>('');
 
   const timerRef = useRef<number | null>(null);
   const startTimeoutRef = useRef<number | null>(null);
@@ -66,6 +71,7 @@ export function useSpeechLecture({
   const isPlayingRef = useRef<boolean>(false);
   const cpsRef = useRef<number>(DEFAULT_BASE_CPS);
   const onCompleteRef = useRef(onSegmentComplete);
+  const userSelectedVoiceRef = useRef<boolean>(false);
 
   onCompleteRef.current = onSegmentComplete;
   speedRef.current = speed;
@@ -100,7 +106,12 @@ export function useSpeechLecture({
     cpsRef.current = DEFAULT_BASE_CPS;
   }, [selectedVoiceUri]);
 
-  // Discover native local browser voices (prioritize id-ID)
+  const setSelectedVoiceUri = useCallback((uri: string) => {
+    userSelectedVoiceRef.current = true;
+    setSelectedVoiceUriState(uri);
+  }, []);
+
+  // Discover native local browser voices (prioritize id-ID/in-ID; never auto-pick foreign voices)
   useEffect(() => {
     if (!isSupported) {
       setHasIndonesianVoice(false);
@@ -110,32 +121,50 @@ export function useSpeechLecture({
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
       if (!voices.length) return;
-      const idVoices = voices.filter((v) => v.lang.toLowerCase().startsWith('id'));
-      setHasIndonesianVoice(idVoices.length > 0);
 
-      const sorted =
-        idVoices.length > 0
-          ? [
-              ...idVoices,
-              ...voices.filter((v) => !v.lang.toLowerCase().startsWith('id')).slice(0, 4),
-            ]
-          : voices.slice(0, 6);
-      setAvailableVoices(sorted);
+      const { indonesianVoices, allowedVoices } = filterAndSortPreferredVoices(voices);
+      setHasIndonesianVoice(indonesianVoices.length > 0);
+      setAvailableVoices(allowedVoices);
 
-      setSelectedVoiceUri((prev) => {
-        if (prev && sorted.some((v) => v.voiceURI === prev)) return prev;
-        const preferred =
-          idVoices.find((v) => /google|gadis|ardi|damayanti/i.test(v.name)) ??
-          idVoices[0] ??
-          sorted[0];
-        return preferred ? preferred.voiceURI : '';
+      const preferredId = pickPreferredIndonesianVoice(indonesianVoices);
+
+      setSelectedVoiceUriState((prev) => {
+        // Respect explicit user choice if that voice is still available (including '' for Default Sistem id-ID)
+        if (userSelectedVoiceRef.current) {
+          if (prev === '' || allowedVoices.some((v) => v.voiceURI === prev)) {
+            return prev;
+          }
+        }
+
+        // Keep existing Indonesian voice if still valid
+        if (
+          prev &&
+          allowedVoices.some((v) => v.voiceURI === prev && isIndonesianVoice(v))
+        ) {
+          return prev;
+        }
+
+        // Auto-select Indonesian voice if available; otherwise stay on '' (Default Sistem id-ID)
+        return preferredId ? preferredId.voiceURI : '';
       });
     };
 
     loadVoices();
-    window.speechSynthesis.onvoiceschanged = loadVoices;
+    const delayedCheck = window.setTimeout(loadVoices, 250);
+    const synth = window.speechSynthesis;
+    if (typeof synth.addEventListener === 'function') {
+      synth.addEventListener('voiceschanged', loadVoices);
+    } else {
+      synth.onvoiceschanged = loadVoices;
+    }
+
     return () => {
-      window.speechSynthesis.onvoiceschanged = null;
+      window.clearTimeout(delayedCheck);
+      if (typeof synth.removeEventListener === 'function') {
+        synth.removeEventListener('voiceschanged', loadVoices);
+      } else {
+        synth.onvoiceschanged = null;
+      }
     };
   }, [isSupported]);
 
@@ -314,10 +343,14 @@ export function useSpeechLecture({
         utterance.rate = activeRate;
         utterance.pitch = 1;
 
-        const chosenVoice = availableVoices.find((v) => v.voiceURI === selectedVoiceUri);
+        const chosenVoice = selectedVoiceUri
+          ? availableVoices.find((v) => v.voiceURI === selectedVoiceUri)
+          : undefined;
         if (chosenVoice) {
           utterance.voice = chosenVoice;
-          utterance.lang = chosenVoice.lang;
+          if (chosenVoice.lang) {
+            utterance.lang = chosenVoice.lang;
+          }
         }
 
         utterance.onstart = () => {
@@ -497,12 +530,14 @@ export function useSpeechLecture({
     [activeIndex, segments, startPlaybackFrom]
   );
 
-  const selectedVoice = availableVoices.find((v) => v.voiceURI === selectedVoiceUri);
+  const selectedVoice = selectedVoiceUri
+    ? availableVoices.find((v) => v.voiceURI === selectedVoiceUri)
+    : undefined;
   const voiceLabel = !isSupported
     ? 'Mode Teks (Browser tanpa TTS)'
     : selectedVoice
       ? `${selectedVoice.name} (${selectedVoice.lang})`
-      : 'Suara AI Lokal (id-ID)';
+      : 'Default Sistem (id-ID)';
 
   return {
     isSupported,

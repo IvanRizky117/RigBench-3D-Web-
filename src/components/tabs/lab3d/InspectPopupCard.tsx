@@ -9,6 +9,7 @@ import {
   X,
 } from '@phosphor-icons/react';
 import type { BusDomain, MainboardComponentSpec } from '../../../types/rigbench';
+import { isIndonesianVoice, pickPreferredIndonesianVoice } from '../../../utils/speechVoices';
 
 interface InspectPopupCardProps {
   component: MainboardComponentSpec;
@@ -73,8 +74,13 @@ export function InspectPopupCard({
     utterance.rate = 1.05;
 
     const voices = window.speechSynthesis.getVoices();
-    const idVoice = voices.find((v) => v.lang.toLowerCase().startsWith('id'));
-    if (idVoice) utterance.voice = idVoice;
+    const idVoice = pickPreferredIndonesianVoice(voices.filter(isIndonesianVoice));
+    if (idVoice) {
+      utterance.voice = idVoice;
+      if (idVoice.lang) {
+        utterance.lang = idVoice.lang;
+      }
+    }
 
     utterance.onend = () => setSpeaking(false);
     utterance.onerror = () => setSpeaking(false);
