@@ -267,6 +267,21 @@
   animation: theater-cue-enter 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+@keyframes theater-card-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(10px, 4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.theater-card-enter {
+  animation: theater-card-enter 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* Mid/High Mobile Blur Tuning */
 @media (max-width: 767px) {
   .datacore-card,

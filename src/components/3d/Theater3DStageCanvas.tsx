@@ -2,7 +2,11 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import type { DirectorKeyframe, TheaterSceneKind } from '../../data/theaterDirectorTimeline';
+import type {
+  DirectorKeyframe,
+  TheaterGuideMode,
+  TheaterSceneKind,
+} from '../../data/theaterDirectorTimeline';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { resolveRenderProfile } from '../../utils/deviceTier';
 import {
@@ -18,10 +22,12 @@ import {
 } from './theaterDioramas';
 import { buildMonitorTerminalDiorama } from './theaterMonitorDiorama';
 import type { BuiltTheaterDiorama } from './theaterDioramaCore';
+import { createTheaterFocusMarker } from './theaterFocusMarker';
 
 interface Theater3DStageCanvasProps {
   sceneKind: TheaterSceneKind;
   keyframe: DirectorKeyframe;
+  guideMode: TheaterGuideMode;
   isPlaying: boolean;
   resyncSignal: number;
   onManualOrbitChange: (isManual: boolean) => void;
@@ -33,6 +39,9 @@ const _targetLook = new THREE.Vector3();
 const _spotTargetPos = new THREE.Vector3();
 const _spotColor = new THREE.Color();
 const _domainColor = new THREE.Color();
+const _tipWorld = new THREE.Vector3();
+const _compBox = new THREE.Box3();
+const _compSize = new THREE.Vector3();
 
 function detectSoftwareGl(): boolean {
   try {
@@ -51,16 +60,19 @@ function detectSoftwareGl(): boolean {
 export function Theater3DStageCanvas({
   sceneKind,
   keyframe,
+  guideMode,
   isPlaying,
   resyncSignal,
   onManualOrbitChange,
   onWebglFailed,
 }: Theater3DStageCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const tagElRef = useRef<HTMLDivElement | null>(null);
   const reducedMotion = useReducedMotion();
 
   // Mutable refs read inside 60fps loop without triggering WebGL re-initialization
   const keyframeRef = useRef<DirectorKeyframe>(keyframe);
+  const guideModeRef = useRef<TheaterGuideMode>(guideMode);
   const isPlayingRef = useRef<boolean>(isPlaying);
   const manualOrbitRef = useRef<boolean>(false);
   const prevKeyframeIdRef = useRef<string>(keyframe.id);
@@ -73,6 +85,7 @@ export function Theater3DStageCanvas({
   onWebglFailedRef.current = onWebglFailed;
 
   keyframeRef.current = keyframe;
+  guideModeRef.current = guideMode;
   isPlayingRef.current = isPlaying;
 
   // Resume cinematic camera when user clicks "Ikuti Kamera" or clicks a chapter dot on the timeline
@@ -125,9 +138,9 @@ export function Theater3DStageCanvas({
     renderer.shadowMap.enabled = profile.shadowsEnabled;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    const width = Math.max(240, host.clientWidth || 640);
-    const height = Math.max(180, host.clientHeight || 360);
-    renderer.setSize(width, height);
+    let viewportW = Math.max(240, host.clientWidth || 640);
+    let viewportH = Math.max(180, host.clientHeight || 360);
+    renderer.setSize(viewportW, viewportH);
     host.appendChild(renderer.domElement);
 
     const onContextLost = (e: Event) => {
@@ -146,8 +159,7 @@ export function Theater3DStageCanvas({
     scene.environment = envRT.texture;
     pmrem.dispose();
 
-    // Dark Documentary Studio Lighting Rig:
-    // Soft low ambient + warm overhead key + cool rim + moving dramatic Studio SpotLight!
+    // Dark Documentary Studio Lighting Rig (ambient smoothly dims in Guide modes to isolate target)
     const hemi = new THREE.HemisphereLight(0xcbd5e1, 0x050810, 0.42);
     scene.add(hemi);
 
@@ -171,18 +183,18 @@ export function Theater3DStageCanvas({
     rimLight.position.set(-8.0, 5.5, -7.5);
     scene.add(rimLight);
 
-    // Dramatic Moving Studio Spotlight that smoothly glides onto the active component!
+    // Dramatic Moving Studio Spotlight that smoothly glides onto the active component
     const initKf = keyframeRef.current;
     const spotTarget = new THREE.Object3D();
     spotTarget.position.set(initKf.anchor3D[0], initKf.anchor3D[1], initKf.anchor3D[2]);
     scene.add(spotTarget);
 
-    const studioSpot = new THREE.SpotLight(0xfff8ef, 42, 22, Math.PI * 0.2, 0.62, 1.5);
+    const studioSpot = new THREE.SpotLight(0xfff8ef, 48, 24, Math.PI * 0.18, 0.6, 1.45);
     studioSpot.position.set(initKf.anchor3D[0] + 1.8, 7.2, initKf.anchor3D[2] + 1.8);
     studioSpot.target = spotTarget;
     scene.add(studioSpot);
 
-    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 80);
+    const camera = new THREE.PerspectiveCamera(38, viewportW / viewportH, 0.1, 80);
     camera.position.set(initKf.cameraPos[0], initKf.cameraPos[1], initKf.cameraPos[2]);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -231,6 +243,10 @@ export function Theater3DStageCanvas({
       scene.add(dioramaBuilt.rootGroup);
     }
 
+    // Precision 3D Focus Ring + Leader Pointer Line
+    const focusMarker = createTheaterFocusMarker();
+    scene.add(focusMarker.rootGroup);
+
     if (!isSoftwareGl) {
       renderer.compile(scene, camera);
     }
@@ -273,11 +289,12 @@ export function Theater3DStageCanvas({
       const elapsed = timer.getElapsed();
       const kf = keyframeRef.current;
       const playing = isPlayingRef.current;
+      const markerActive = guideModeRef.current !== 'cinema';
 
       // 1. Smooth cinematic ~0.8s camera glide when following narration
       if (!manualOrbitRef.current) {
-        const swayX = !reducedMotion && playing ? Math.sin(elapsed * 0.42) * 0.14 : 0;
-        const swayY = !reducedMotion && playing ? Math.cos(elapsed * 0.34) * 0.07 : 0;
+        const swayX = !reducedMotion && playing ? Math.sin(elapsed * 0.42) * 0.12 : 0;
+        const swayY = !reducedMotion && playing ? Math.cos(elapsed * 0.34) * 0.06 : 0;
         _targetCamPos.set(
           kf.cameraPos[0] + swayX,
           kf.cameraPos[1] + swayY,
@@ -296,8 +313,33 @@ export function Theater3DStageCanvas({
       }
 
       controls.update();
+      camera.updateMatrixWorld();
 
-      // 2. Smoothly glide dramatic overhead studio spotlight onto the active component
+      // 2. Surrounding ambient dimming + tightened spotlight when visual guide is ON
+      const lightDamp = 6.5;
+      hemi.intensity = THREE.MathUtils.damp(hemi.intensity, markerActive ? 0.18 : 0.42, lightDamp, dt);
+      keyLight.intensity = THREE.MathUtils.damp(keyLight.intensity, markerActive ? 0.38 : 0.88, lightDamp, dt);
+      rimLight.intensity = THREE.MathUtils.damp(rimLight.intensity, markerActive ? 0.28 : 0.55, lightDamp, dt);
+      scene.environmentIntensity = THREE.MathUtils.damp(
+        scene.environmentIntensity,
+        markerActive ? 0.46 : 1.0,
+        lightDamp,
+        dt
+      );
+      studioSpot.intensity = THREE.MathUtils.damp(
+        studioSpot.intensity,
+        markerActive ? 74 : 42,
+        lightDamp,
+        dt
+      );
+      studioSpot.angle = THREE.MathUtils.damp(
+        studioSpot.angle,
+        markerActive ? Math.PI * 0.145 : Math.PI * 0.2,
+        lightDamp,
+        dt
+      );
+
+      // 3. Smoothly glide dramatic overhead studio spotlight onto the active component
       _spotTargetPos.set(kf.anchor3D[0], kf.anchor3D[1], kf.anchor3D[2]);
       spotTarget.position.x = THREE.MathUtils.damp(spotTarget.position.x, _spotTargetPos.x, 6, dt);
       spotTarget.position.y = THREE.MathUtils.damp(spotTarget.position.y, _spotTargetPos.y, 6, dt);
@@ -306,7 +348,7 @@ export function Theater3DStageCanvas({
       const spotZOffset = _spotTargetPos.z < -3.0 ? -2.4 : 1.9;
       studioSpot.position.x = THREE.MathUtils.damp(
         studioSpot.position.x,
-        _spotTargetPos.x + 1.4,
+        _spotTargetPos.x + 1.3,
         5,
         dt
       );
@@ -317,12 +359,11 @@ export function Theater3DStageCanvas({
         dt
       );
 
-      // Blend crisp studio warm-white with subtle tint of active domain color
       _domainColor.set(kf.domainColor);
-      _spotColor.set('#FFF8EF').lerp(_domainColor, 0.18);
+      _spotColor.set('#FFF8EF').lerp(_domainColor, markerActive ? 0.22 : 0.14);
       studioSpot.color.lerp(_spotColor, Math.min(1, dt * 6));
 
-      // 3. Scene-specific mechanical animations & active sheen
+      // 4. Scene-specific mechanical animations & active sheen
       if (studioMobo) {
         studioMobo.update(
           elapsed,
@@ -337,7 +378,58 @@ export function Theater3DStageCanvas({
         dioramaBuilt.update(elapsed, dt, kf.mechAction, kf.anchor3D, kf.domainColor, playing);
       }
 
+      // 5. Resolve focus ring radius (explicit keyframe radius or fitted from studioMobo Box3)
+      let resolvedRadius = kf.focusRadius ?? 0.85;
+      if (
+        kf.focusRadius === undefined &&
+        studioMobo &&
+        kf.highlightId &&
+        studioMobo.componentGroups[kf.highlightId]
+      ) {
+        _compBox.setFromObject(studioMobo.componentGroups[kf.highlightId]);
+        _compBox.getSize(_compSize);
+        resolvedRadius = Math.max(0.35, Math.min(2.1, Math.max(_compSize.x, _compSize.z) * 0.56));
+      }
+
+      const markerState = focusMarker.update({
+        elapsed,
+        dt,
+        visible: markerActive,
+        anchor: kf.anchor3D,
+        radius: resolvedRadius,
+        plane: kf.focusPlane ?? 'xz',
+        colorHex: kf.domainColor,
+        isPlaying: playing,
+        reducedMotion,
+        camera,
+      });
+
       renderer.render(scene, camera);
+
+      // 6. Project 3D pointer tip directly onto floating DOM tag (zero React state re-renders!)
+      const tagEl = tagElRef.current;
+      if (tagEl) {
+        if (!markerState.visible || markerState.opacity < 0.03) {
+          tagEl.style.opacity = '0';
+        } else {
+          focusMarker.getTipWorldPosition(_tipWorld);
+          _tipWorld.project(camera);
+          const inFront = _tipWorld.z >= -1 && _tipWorld.z <= 1;
+          if (!inFront) {
+            tagEl.style.opacity = '0';
+          } else {
+            const rawX = (_tipWorld.x * 0.5 + 0.5) * viewportW;
+            const rawY = (-_tipWorld.y * 0.5 + 0.5) * viewportH;
+            const tagW = tagEl.offsetWidth || 156;
+            const tagH = tagEl.offsetHeight || 28;
+            // Anchor tag slightly right of pointer tip; clamp cleanly inside stage safe bounds
+            const clampedX = Math.max(12, Math.min(viewportW - tagW - 12, rawX + 6));
+            const clampedY = Math.max(12, Math.min(viewportH - tagH - 18, rawY - tagH * 0.5));
+            tagEl.style.transform = `translate3d(${clampedX.toFixed(1)}px, ${clampedY.toFixed(1)}px, 0)`;
+            tagEl.style.opacity = markerState.opacity.toFixed(2);
+          }
+        }
+      }
 
       if (isSoftwareGl) {
         afterDraw(tick);
@@ -388,6 +480,8 @@ export function Theater3DStageCanvas({
       const w = host.clientWidth;
       const h = host.clientHeight;
       if (w <= 0 || h <= 0) return;
+      viewportW = w;
+      viewportH = h;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
@@ -408,6 +502,7 @@ export function Theater3DStageCanvas({
       controls.removeEventListener('start', onControlStart);
       controls.dispose();
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
+      focusMarker.dispose();
       studioMobo?.dispose();
       dioramaBuilt?.dispose();
       envRT.dispose();
@@ -418,11 +513,41 @@ export function Theater3DStageCanvas({
     };
   }, [sceneKind, reducedMotion]);
 
+  // Avoid duplicate point number if shortLabel already starts with pdfBadge (e.g. "#16 PS/2 Hijau")
+  const tagName = keyframe.shortLabel.startsWith(keyframe.pdfBadge)
+    ? keyframe.shortLabel.slice(keyframe.pdfBadge.length).trim()
+    : keyframe.shortLabel;
+
   return (
-    <div
-      ref={containerRef}
-      aria-label="Panggung Visual 3D Studio Dokumenter Perangkat Keras"
-      className="h-full w-full cursor-grab touch-none active:cursor-grabbing"
-    />
+    <div className="relative h-full w-full overflow-hidden">
+      <div
+        ref={containerRef}
+        aria-label="Panggung Visual 3D Studio Dokumenter Perangkat Keras"
+        className="h-full w-full cursor-grab touch-none active:cursor-grabbing"
+      />
+
+      {/* Slim Floating 3D Pointer Tag (zero backdrop-filter over WebGL, 60fps direct transform) */}
+      <div
+        ref={tagElRef}
+        aria-hidden="true"
+        className="pointer-events-none absolute top-0 left-0 z-10 flex max-w-[230px] items-center gap-1.5 rounded-md border border-white/15 bg-[#060C18]/92 px-2 py-1 shadow-[0_6px_18px_rgba(0,0,0,0.72)] will-change-transform"
+        style={{ opacity: 0, transform: 'translate3d(-999px, -999px, 0)' }}
+      >
+        <span
+          className="shrink-0 font-mono text-[10px] font-bold tracking-wide"
+          style={{ color: keyframe.domainColor }}
+        >
+          {keyframe.pdfBadge}
+        </span>
+        {tagName && (
+          <>
+            <span className="text-[10px] text-[#475569]">·</span>
+            <span className="truncate text-[11px] font-medium text-[#F1F5F9]">
+              {tagName}
+            </span>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

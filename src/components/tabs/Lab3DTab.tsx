@@ -120,10 +120,15 @@ function getInitialRotationForPart(itemId: AssemblyStepId | null): number {
 }
 
 function isPartOrientationValid(itemId: AssemblyStepId, rotationStep: number): boolean {
-  if (itemId === 'install-cpu') return rotationStep % 4 === 0;
+  const norm = ((rotationStep % 4) + 4) % 4;
   if (
+    itemId === 'install-cpu' ||
     itemId === 'install-ram-1' ||
-    itemId === 'install-ram-2' ||
+    itemId === 'install-ram-2'
+  ) {
+    return norm === 0;
+  }
+  if (
     itemId === 'install-ide-cable' ||
     itemId === 'wire-hdd-led' ||
     itemId === 'wire-pled-pos' ||
@@ -135,14 +140,7 @@ function isPartOrientationValid(itemId: AssemblyStepId, rotationStep: number): b
 }
 
 function doesSimpleSocketMatch(targetSocketId: string, clickedSocketId: string): boolean {
-  if (clickedSocketId === targetSocketId) return true;
-  if (
-    (targetSocketId === 'ram-slot-1' || targetSocketId === 'ram-slot-2') &&
-    clickedSocketId === 'ram-slots'
-  ) {
-    return true;
-  }
-  return false;
+  return clickedSocketId === targetSocketId;
 }
 
 // Top-most uninstall priority when clicking installed 3D hardware in Free Roam mode
@@ -1203,15 +1201,20 @@ export function Lab3DTab({
       if (!isPartOrientationValid(itemId, currentRotation)) {
         if (!isFreeRoam) setMistakes((m) => m + 1);
         labSfx.playRuleWarning();
+        const isFlipped180 = ((currentRotation % 4) + 4) % 4 === 2;
         onNotify(
-          itemId === 'install-cpu' ? 'Orientasi Segitiga CPU Belum Cocok' : 'Celah Notch RAM Terbalik',
+          itemId === 'install-cpu'
+            ? 'Orientasi Segitiga CPU Belum Cocok'
+            : isFlipped180
+              ? 'Celah Notch RAM Terbalik 180°'
+              : 'Posisi RAM Belum Sejajar',
           itemId === 'install-cpu'
             ? isTouchInput
               ? 'Ketuk tombol Putar kanan (atau tap 2 jari) hingga panah segitiga emas sejajar sudut Pin-1 soket LGA 775!'
               : 'Tekan tombol [R] hingga panah segitiga emas sejajar sudut Pin-1 soket LGA 775!'
             : isTouchInput
-              ? 'Ketuk tombol Putar kanan (atau tap 2 jari) hingga panah notch DDR2 sejajar tonjolan slot DIMM!'
-              : 'Tekan tombol [R] hingga panah notch DDR2 sejajar dengan tonjolan slot DIMM!',
+              ? 'Ketuk tombol Putar kanan (atau tap 2 jari) hingga panah notch DDR2 tepat di atas tonjolan slot DIMM!'
+              : 'Tekan tombol [R] hingga panah notch DDR2 tepat sejajar di atas tonjolan slot DIMM!',
           'warning'
         );
         return;
@@ -1345,14 +1348,30 @@ export function Lab3DTab({
       }
 
       if (!doesSimpleSocketMatch(targetItem.targetSocketId, socketId)) {
+        if (itemId === 'install-ram-1' || itemId === 'install-ram-2') {
+          return {
+            state: 'invalid',
+            reason:
+              itemId === 'install-ram-1'
+                ? 'Salah slot — arahkan tepat ke Slot DIMM 1 (cyan pertama)'
+                : 'Salah slot — arahkan tepat ke Slot DIMM 2 (cyan kedua)',
+          };
+        }
         return { state: 'invalid', reason: 'Soket tidak cocok untuk komponen ini' };
       }
       if (!isPartOrientationValid(itemId, rot)) {
+        const isRam = itemId === 'install-ram-1' || itemId === 'install-ram-2';
+        const isFlipped180 = ((rot % 4) + 4) % 4 === 2;
         return {
           state: 'invalid',
-          reason: isTouchInput
-            ? 'Orientasi belum sejajar — tap 2 jari atau ketuk Putar!'
-            : 'Orientasi belum sejajar — tekan tombol [R] untuk memutar!',
+          reason:
+            isRam && isFlipped180
+              ? isTouchInput
+                ? 'Notch RAM terbalik 180° — ketuk Putar hingga titik notch sejajar!'
+                : 'Notch RAM terbalik 180° — tekan [R] hingga titik notch sejajar!'
+              : isTouchInput
+                ? 'Orientasi belum sejajar — tap 2 jari atau ketuk Putar!'
+                : 'Orientasi belum sejajar — tekan tombol [R] untuk memutar!',
         };
       }
       return {

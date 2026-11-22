@@ -36,14 +36,15 @@ export function getRotateToolMeta(
     };
   }
   if (activeHeldId === 'install-ram-1' || activeHeldId === 'install-ram-2') {
-    const deg = (rotationStep % 2) * 180;
+    const normStep = ((rotationStep % 4) + 4) % 4;
+    const deg = normStep * 90;
     return {
       show: true,
-      aligned: rotationStep % 2 === 0,
-      actionLabel: 'Putar RAM',
+      aligned: normStep === 0,
+      actionLabel: normStep === 2 ? 'Notch Terbalik' : 'Putar RAM',
       alignedLabel: 'Notch Sejajar',
       angleBadge: `${deg}°`,
-      gestureHint: 'Sejajarkan celah notch',
+      gestureHint: normStep === 2 ? 'Notch terbalik 180° — putar lagi' : 'Sejajarkan celah notch',
     };
   }
   if (activeHeldId === 'install-ide-cable') {

@@ -111,8 +111,6 @@ const DEFAULT_CAM_TARGET = new THREE.Vector3(0.45, 0.25, 0.55);
 
 const BROAD_SOCKET_SNAP_COORDS: Record<string, [number, number, number]> = {
   'cpu-socket': [2.1, 0.42, -1.6],
-  'ram-slot-1': [1.9, 0.52, 1.19],
-  'ram-slot-2': [1.9, 0.52, 2.07],
   'cmos-battery': [-1.4, 0.32, 2.35],
   'pcie-x16': [-1.5, 0.44, -1.68],
   'hdd-bay': [-1.35, 0.32, 6.25],
@@ -626,11 +624,7 @@ export function FullMotherboardLabCanvas({
         const boxHits = raycaster.intersectObjects(built.hitboxes, false);
         const directHit = pickBestHit(boxHits, true);
         if (directHit) {
-          if (directHit === 'ram-slots') {
-            snappedSocket = activeDragId === 'install-ram-2' ? 'ram-slot-2' : 'ram-slot-1';
-          } else {
-            snappedSocket = directHit;
-          }
+          snappedSocket = directHit;
         }
 
         const planeHit = raycaster.ray.intersectPlane(dragPlane, dragHitPoint);

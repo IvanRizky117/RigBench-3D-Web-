@@ -234,3 +234,71 @@ export function snapKeyframePctsToWaveform(
 
   return snapped;
 }
+
+/**
+ * Piecewise-warps a phonetic word timeline (0..100%) using matched base -> snapped
+ * WAV keyframe boundaries so subtitles and 3D director cues stay 100% locked together.
+ */
+export function warpWordTimelineToKeyframes(
+  timeline: PhoneticWordTiming[],
+  basePcts: number[],
+  snappedPcts: number[]
+): PhoneticWordTiming[] {
+  if (
+    timeline.length === 0 ||
+    basePcts.length === 0 ||
+    basePcts.length !== snappedPcts.length
+  ) {
+    return timeline;
+  }
+
+  // Build sorted anchor pairs starting at (0,0) and ending at (100,100)
+  const anchors: Array<{ base: number; snapped: number }> = [{ base: 0, snapped: 0 }];
+  for (let i = 0; i < basePcts.length; i++) {
+    const b = basePcts[i];
+    const s = snappedPcts[i];
+    const prev = anchors[anchors.length - 1];
+    if (b > prev.base + 0.05 && b < 99.9 && s > prev.snapped + 0.05 && s < 99.9) {
+      anchors.push({ base: b, snapped: s });
+    }
+  }
+  anchors.push({ base: 100, snapped: 100 });
+
+  const mapPct = (rawPct: number): number => {
+    const clamped = Math.max(0, Math.min(100, rawPct));
+    for (let i = 0; i < anchors.length - 1; i++) {
+      const a = anchors[i];
+      const b = anchors[i + 1];
+      if (clamped <= b.base || i === anchors.length - 2) {
+        const span = Math.max(0.0001, b.base - a.base);
+        const t = Math.max(0, Math.min(1, (clamped - a.base) / span));
+        return a.snapped + (b.snapped - a.snapped) * t;
+      }
+    }
+    return clamped;
+  };
+
+  return timeline.map((entry, idx) => ({
+    ...entry,
+    startPct: idx === 0 ? 0 : mapPct(entry.startPct),
+    endPct: idx === timeline.length - 1 ? 100 : mapPct(entry.endPct),
+  }));
+}
+
+/**
+ * Finds the active global word index inside a (possibly WAV-warped) phonetic timeline.
+ */
+export function findWordIndexInTimeline(
+  timeline: PhoneticWordTiming[],
+  progressPct: number
+): number | null {
+  if (!timeline.length) return null;
+  const clamped = Math.max(0, Math.min(100, progressPct));
+  for (let i = 0; i < timeline.length; i++) {
+    if (clamped <= timeline[i].endPct) {
+      return timeline[i].wordIndex;
+    }
+  }
+  return timeline[timeline.length - 1].wordIndex;
+}
+

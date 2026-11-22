@@ -2,10 +2,13 @@ import { useState } from 'react';
 import {
   CircleNotch,
   ClosedCaptioning,
+  CrosshairSimple,
   FastForward,
+  FilmStrip,
   ListBullets,
   Pause,
   Play,
+  SidebarSimple,
   SkipBack,
   SkipForward,
   SpeakerHigh,
@@ -13,7 +16,7 @@ import {
   SpeakerSlash,
   Stop,
 } from '@phosphor-icons/react';
-import type { DirectorKeyframe } from '../../../data/theaterDirectorTimeline';
+import type { DirectorKeyframe, TheaterGuideMode } from '../../../data/theaterDirectorTimeline';
 import type { PlaybackSpeed, SpeechLectureController } from '../../../hooks/useSpeechLecture';
 
 interface TheaterControlsBarProps {
@@ -26,6 +29,8 @@ interface TheaterControlsBarProps {
   onSelectSegment: (idx: number) => void;
   ccEnabled: boolean;
   onToggleCc: () => void;
+  guideMode: TheaterGuideMode;
+  onChangeGuideMode: (mode: TheaterGuideMode) => void;
   transcriptOpen: boolean;
   onToggleTranscript: () => void;
   isFullscreen: boolean;
@@ -33,6 +38,32 @@ interface TheaterControlsBarProps {
 }
 
 const SPEEDS: PlaybackSpeed[] = [0.75, 1, 1.25, 1.5];
+
+const GUIDE_MODES: Array<{
+  id: TheaterGuideMode;
+  label: string;
+  title: string;
+  icon: typeof SidebarSimple;
+}> = [
+  {
+    id: 'full',
+    label: 'Lengkap',
+    title: 'Panduan Lengkap: Penanda 3D + Kartu Info adaptif',
+    icon: SidebarSimple,
+  },
+  {
+    id: 'marker',
+    label: 'Penanda',
+    title: 'Penanda 3D Saja: Lingkaran fokus + label tanpa kartu info',
+    icon: CrosshairSimple,
+  },
+  {
+    id: 'cinema',
+    label: 'Sinema',
+    title: 'Mode Sinema Bersih: Panggung 3D murni tanpa penanda atau kartu',
+    icon: FilmStrip,
+  },
+];
 
 function formatTimeSec(totalSec: number): string {
   const safe = Math.max(0, Math.round(totalSec));
@@ -51,6 +82,8 @@ export function TheaterControlsBar({
   onSelectSegment,
   ccEnabled,
   onToggleCc,
+  guideMode,
+  onChangeGuideMode,
   transcriptOpen,
   onToggleTranscript,
   isFullscreen,
@@ -64,7 +97,7 @@ export function TheaterControlsBar({
 
   return (
     <div
-      className={`z-20 space-y-2 px-3.5 py-2.5 sm:px-5 sm:py-3 transition-opacity duration-300 ${
+      className={`z-20 space-y-2 px-4 py-2.5 sm:px-6 sm:py-3 transition-opacity duration-300 ${
         isFullscreen
           ? 'absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#02050C]/95 via-[#02050C]/85 to-transparent pt-6'
           : 'border-t border-white/[0.06] bg-[#04070E]'
@@ -74,7 +107,7 @@ export function TheaterControlsBar({
       <div className="space-y-1.5">
         {activeChapter && chapters.length > 1 && (
           <div className="flex items-center justify-between gap-2 text-[11px] text-[#94A3B8]">
-            <span className="truncate">
+            <span className="min-w-0 truncate">
               <span
                 className="font-mono font-semibold"
                 style={{ color: activeChapter.domainColor }}
@@ -91,7 +124,7 @@ export function TheaterControlsBar({
         )}
 
         <div className="flex items-center gap-3">
-          <span className="w-9 font-mono text-[11px] text-[#94A3B8] tabular-nums">
+          <span className="w-9 shrink-0 font-mono text-[11px] text-[#94A3B8] tabular-nums">
             {formatTimeSec(currentSec)}
           </span>
 
@@ -104,7 +137,6 @@ export function TheaterControlsBar({
               />
             </div>
 
-            {/* Native accessible scrubber overlaid cleanly */}
             <input
               type="range"
               min={0}
@@ -116,7 +148,6 @@ export function TheaterControlsBar({
               className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
             />
 
-            {/* Thin Chapter Dots directly on the timeline */}
             {chapters.length > 1 &&
               chapters.map((ch, idx) => {
                 const leftPct = Math.max(0.8, Math.min(99.2, ch.startPct));
@@ -163,19 +194,19 @@ export function TheaterControlsBar({
               })}
           </div>
 
-          <span className="w-9 text-right font-mono text-[11px] text-[#94A3B8] tabular-nums">
+          <span className="w-9 shrink-0 text-right font-mono text-[11px] text-[#94A3B8] tabular-nums">
             {formatTimeSec(speech.durationSec)}
           </span>
         </div>
       </div>
 
-      {/* Main Transport + Volume Slider + CC / Transcript / Speed */}
+      {/* Main Transport + Volume Slider + 3-Mode Visual Guide Switcher + CC / Speed */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={speech.togglePlay}
-            className="sapphire-btn inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap"
+            className="sapphire-btn inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap"
           >
             {speech.isLoadingAudio ? (
               <CircleNotch size={15} weight="bold" className="animate-spin" />
@@ -196,7 +227,7 @@ export function TheaterControlsBar({
             onClick={speech.stop}
             aria-label="Hentikan narasi"
             title="Hentikan narasi"
-            className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg text-[#94A3B8] hover:bg-white/[0.06] hover:text-[#F8FAFC] press-feedback"
+            className="inline-flex min-h-[38px] min-w-[38px] items-center justify-center rounded-lg text-[#94A3B8] hover:bg-white/[0.06] hover:text-[#F8FAFC] press-feedback"
           >
             <Stop size={15} weight="fill" />
           </button>
@@ -208,7 +239,7 @@ export function TheaterControlsBar({
                 disabled={activeSegmentIndex === 0}
                 onClick={() => onSelectSegment(Math.max(0, activeSegmentIndex - 1))}
                 aria-label="Sub-bab sebelumnya"
-                className="inline-flex min-h-[40px] min-w-[38px] items-center justify-center rounded-lg text-[#94A3B8] hover:bg-white/[0.06] hover:text-[#F8FAFC] disabled:opacity-30"
+                className="inline-flex min-h-[38px] min-w-[36px] items-center justify-center rounded-lg text-[#94A3B8] hover:bg-white/[0.06] hover:text-[#F8FAFC] disabled:opacity-30"
               >
                 <SkipBack size={15} weight="bold" />
               </button>
@@ -219,21 +250,21 @@ export function TheaterControlsBar({
                   onSelectSegment(Math.min(segmentsCount - 1, activeSegmentIndex + 1))
                 }
                 aria-label="Sub-bab berikutnya"
-                className="inline-flex min-h-[40px] min-w-[38px] items-center justify-center rounded-lg text-[#94A3B8] hover:bg-white/[0.06] hover:text-[#F8FAFC] disabled:opacity-30"
+                className="inline-flex min-h-[38px] min-w-[36px] items-center justify-center rounded-lg text-[#94A3B8] hover:bg-white/[0.06] hover:text-[#F8FAFC] disabled:opacity-30"
               >
                 <SkipForward size={15} weight="bold" />
               </button>
             </div>
           )}
 
-          {/* Dedicated TTS Volume Control (Default 68%, works cleanly in Normal & Fullscreen) */}
+          {/* Dedicated TTS Volume Control */}
           <div className="flex items-center gap-1.5 pl-1">
             <button
               type="button"
               onClick={speech.toggleMute}
               aria-label={speech.isMuted ? 'Nyalakan suara narasi' : 'Bisukan suara narasi'}
               title={speech.isMuted ? 'Nyalakan suara' : 'Bisukan suara'}
-              className="inline-flex min-h-[40px] min-w-[36px] items-center justify-center rounded-lg text-[#CBD5E1] hover:bg-white/[0.06] hover:text-[#38BDF8]"
+              className="inline-flex min-h-[38px] min-w-[34px] items-center justify-center rounded-lg text-[#CBD5E1] hover:bg-white/[0.06] hover:text-[#38BDF8]"
             >
               {speech.isMuted || speech.volume <= 0.01 ? (
                 <SpeakerSlash size={16} weight="bold" className="text-[#F59E0B]" />
@@ -251,7 +282,7 @@ export function TheaterControlsBar({
               value={volumePct}
               onChange={(e) => speech.setVolume(Number(e.target.value) / 100)}
               aria-label="Volume suara narasi"
-              className="h-1.5 w-16 sm:w-20 cursor-pointer accent-[#38BDF8]"
+              className="h-1.5 w-14 sm:w-20 cursor-pointer accent-[#38BDF8]"
             />
             <span className="hidden sm:inline w-8 font-mono text-[11px] text-[#94A3B8] tabular-nums">
               {volumePct}%
@@ -260,12 +291,41 @@ export function TheaterControlsBar({
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          {/* 3-Mode Visual Guide Switcher (works in both Normal & Fullscreen!) */}
+          <div
+            role="group"
+            aria-label="Mode panduan visual 3D dan kartu info"
+            className="inline-flex min-h-[36px] items-center gap-0.5 rounded-lg border border-white/[0.08] bg-white/[0.04] p-0.5"
+          >
+            {GUIDE_MODES.map((m) => {
+              const Icon = m.icon;
+              const active = guideMode === m.id;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => onChangeGuideMode(m.id)}
+                  aria-pressed={active}
+                  title={m.title}
+                  className={`inline-flex min-h-[30px] items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium whitespace-nowrap transition-colors press-feedback ${
+                    active
+                      ? 'bg-[#2563EB] text-white'
+                      : 'text-[#94A3B8] hover:text-[#F8FAFC]'
+                  }`}
+                >
+                  <Icon size={13} weight={active ? 'fill' : 'bold'} />
+                  <span className="hidden sm:inline">{m.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
           <button
             type="button"
             onClick={onToggleCc}
             aria-pressed={ccEnabled}
             title={ccEnabled ? 'Sembunyikan subtitle' : 'Tampilkan subtitle'}
-            className={`inline-flex min-h-[38px] items-center gap-1 rounded-lg px-2.5 text-xs font-medium transition-colors press-feedback ${
+            className={`inline-flex min-h-[36px] items-center gap-1 rounded-lg px-2.5 text-xs font-medium transition-colors press-feedback ${
               ccEnabled
                 ? 'bg-[#2563EB]/20 text-[#38BDF8]'
                 : 'text-[#94A3B8] hover:bg-white/[0.06] hover:text-[#F8FAFC]'
@@ -280,21 +340,21 @@ export function TheaterControlsBar({
               type="button"
               onClick={onToggleTranscript}
               aria-expanded={transcriptOpen}
-              className={`inline-flex min-h-[38px] items-center gap-1 rounded-lg px-2.5 text-xs font-medium transition-colors press-feedback ${
+              className={`inline-flex min-h-[36px] items-center gap-1 rounded-lg px-2.5 text-xs font-medium transition-colors press-feedback ${
                 transcriptOpen
                   ? 'bg-[#2563EB]/20 text-[#38BDF8]'
                   : 'text-[#94A3B8] hover:bg-white/[0.06] hover:text-[#F8FAFC]'
               }`}
             >
               <ListBullets size={16} weight="bold" />
-              <span className="hidden sm:inline">Transkrip</span>
+              <span className="hidden md:inline">Transkrip</span>
             </button>
           )}
 
           <div
             role="group"
             aria-label="Kecepatan pemutaran suara"
-            className="inline-flex min-h-[38px] items-center gap-0.5 rounded-lg bg-white/[0.04] p-0.5"
+            className="inline-flex min-h-[36px] items-center gap-0.5 rounded-lg bg-white/[0.04] p-0.5"
           >
             <FastForward size={13} className="mx-1 text-[#64748B] hidden sm:block" />
             {SPEEDS.map((rate) => (
@@ -302,7 +362,7 @@ export function TheaterControlsBar({
                 key={rate}
                 type="button"
                 onClick={() => speech.setSpeed(rate)}
-                className={`min-h-[32px] rounded-md px-2 py-1 font-mono text-[11px] font-medium whitespace-nowrap press-feedback ${
+                className={`min-h-[30px] rounded-md px-2 py-1 font-mono text-[11px] font-medium whitespace-nowrap press-feedback ${
                   speech.speed === rate
                     ? 'bg-[#2563EB] text-white'
                     : 'text-[#94A3B8] hover:text-[#F8FAFC]'

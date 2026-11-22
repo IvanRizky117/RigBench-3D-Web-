@@ -1649,8 +1649,8 @@ export function buildProceduralMotherboard(
     rootGroup.add(hb);
     hitboxes.push(hb);
   };
-  addExtraHitbox('ram-slot-1', [1.9, 0.56, 1.19], [4.4, 0.85, 0.4]);
-  addExtraHitbox('ram-slot-2', [1.9, 0.56, 2.07], [4.4, 0.85, 0.4]);
+  addExtraHitbox('ram-slot-1', [1.9, 0.56, 1.19], [4.4, 1.06, 0.36]);
+  addExtraHitbox('ram-slot-2', [1.9, 0.56, 2.07], [4.4, 1.06, 0.36]);
   addExtraHitbox('hdd-bay', [-1.35, 0.28, 6.25], [2.95, 0.65, 1.95]);
   addExtraHitbox('atx-4pin', [4.1, 0.42, -2.5], [0.85, 0.72, 0.85]);
 
