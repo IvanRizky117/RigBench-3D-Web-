@@ -102,14 +102,14 @@ export function LocalTtsGuideModal({
             </span>
             <div>
               <h3 id="tts-guide-heading" className="text-sm font-semibold text-[#F8FAFC]">
-                Panduan Suara AI Lokal (id-ID)
+                Panduan Suara Tutor AI &amp; Mode Lokal (id-ID)
               </h3>
               <p className="text-[11px] text-[#94A3B8]">
                 {!isSupported
-                  ? 'Browser ini memakai mode teks sinkron timer.'
+                  ? 'Suara AI di-cache otomatis; browser tanpa TTS lokal tetap memakai subtitle sinkron.'
                   : hasIndonesianVoice
-                    ? 'Suara Bahasa Indonesia lokal sudah terdeteksi di perangkat.'
-                    : 'Suara id-ID belum aktif — ikuti langkah singkat berikut.'}
+                    ? 'Suara Tutor AI aktif dengan cache hemat token + cadangan id-ID lokal.'
+                    : 'Suara Tutor AI aktif; suara lokal perangkat id-ID dapat diaktifkan sebagai cadangan offline.'}
               </p>
             </div>
           </div>
@@ -125,20 +125,21 @@ export function LocalTtsGuideModal({
 
         <ol className="mt-4 space-y-2 text-xs leading-relaxed text-[#CBD5E1]">
           <li className="rounded-xl border border-[#3B82F6]/15 bg-[#040915] p-3">
-            <strong className="text-[#F8FAFC]">1. HP Android / Infinix:</strong> Buka{' '}
-            <span className="text-[#38BDF8]">Pengaturan → Sistem → Bahasa &amp; Masukan → Output Text-to-Speech</span>, pilih{' '}
-            <strong className="text-white">Layanan Suara Google</strong> dan unduh data suara{' '}
-            <strong className="text-white">Indonesia (id-ID)</strong>.
+            <strong className="text-[#F8FAFC]">1. Suara Tutor AI (Hemat Token):</strong> Setiap segmen
+            hanya disintesis sekali oleh Gemini TTS, lalu disimpan permanen di cache server dan
+            IndexedDB browser sehingga putar ulang maupun geser timeline memakan{' '}
+            <span className="text-[#38BDF8]">0 token</span>.
           </li>
           <li className="rounded-xl border border-[#3B82F6]/15 bg-[#040915] p-3">
-            <strong className="text-[#F8FAFC]">2. Laptop Windows / Chrome:</strong> Suara{' '}
-            <span className="text-[#38BDF8]">Google Bahasa Indonesia</span> atau{' '}
-            <span className="text-[#38BDF8]">Microsoft Gadis/Ardi</span> langsung tersedia secara
-            lokal tanpa internet berbayar.
+            <strong className="text-[#F8FAFC]">2. Cadangan Offline (Android / Windows):</strong>{' '}
+            Saat offline tanpa cache, aktifkan{' '}
+            <span className="text-[#38BDF8]">Layanan Suara Google (id-ID)</span> atau pilih persona{' '}
+            <strong className="text-white">Suara Lokal Perangkat</strong>.
           </li>
           <li className="rounded-xl border border-[#3B82F6]/15 bg-[#040915] p-3">
-            <strong className="text-[#F8FAFC]">3. Mode Tanpa Suara:</strong> Meskipun perangkat
-            sedang bisu, subtitle sebaris dan sorotan diagram tetap berjalan sinkron otomatis.
+            <strong className="text-[#F8FAFC]">3. Kecepatan &amp; Subtitle:</strong> Gunakan kontrol{' '}
+            <span className="text-[#38BDF8]">0.75x – 1.5x</span> tanpa mengubah nada suara; sorotan
+            kata dan diagram tetap sinkron otomatis.
           </li>
         </ol>
 

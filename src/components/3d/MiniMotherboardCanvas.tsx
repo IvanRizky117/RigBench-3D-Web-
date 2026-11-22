@@ -53,6 +53,12 @@ export function MiniMotherboardCanvas({
     renderer.setSize(width, height);
     host.appendChild(renderer.domElement);
 
+    const onContextLost = (e: Event) => {
+      e.preventDefault();
+      setWebglFailed(true);
+    };
+    renderer.domElement.addEventListener('webglcontextlost', onContextLost);
+
     const scene = new THREE.Scene();
     scene.background = frameless ? null : new THREE.Color(0x030814);
 
@@ -105,7 +111,8 @@ export function MiniMotherboardCanvas({
     let docVisible = !document.hidden;
     let frameId = 0;
     let disposed = false;
-    const clock = new THREE.Clock();
+    const timer = new THREE.Timer();
+    timer.connect(document);
 
     const afterDraw = (cb: () => void) => {
       const gl = renderer.getContext() as WebGL2RenderingContext;
@@ -133,7 +140,8 @@ export function MiniMotherboardCanvas({
 
     const tick = () => {
       if (disposed || !inView || !docVisible) return;
-      const elapsed = clock.getElapsedTime();
+      timer.update();
+      const elapsed = timer.getElapsed();
       if (!reducedMotion) {
         built.dataFlow.update(elapsed);
         if (isSoftwareGl) {
@@ -157,7 +165,7 @@ export function MiniMotherboardCanvas({
 
     const resumeIfActive = () => {
       if (!disposed && inView && docVisible && !frameId) {
-        clock.getDelta();
+        timer.reset();
         tick();
       }
     };
@@ -204,9 +212,11 @@ export function MiniMotherboardCanvas({
       disposed = true;
       inView = false;
       stopLoop();
+      timer.dispose();
       observer.disconnect();
       document.removeEventListener('visibilitychange', onVisibilityChange);
       resizeObserver.disconnect();
+      renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       controls.dispose();
       built.dispose();
       envRT.dispose();

@@ -554,7 +554,8 @@ export function FullMotherboardLabCanvas({
     renderer.domElement.addEventListener('pointermove', onPointerMove);
 
     const _proj = new THREE.Vector3();
-    const clock = new THREE.Clock();
+    const timer = new THREE.Timer();
+    timer.connect(document);
     let frameId = 0;
     let disposed = false;
     let isTabHidden = document.hidden;
@@ -588,8 +589,9 @@ export function FullMotherboardLabCanvas({
 
     const tick = () => {
       if (disposed || isTabHidden) return;
-      const delta = Math.min(clock.getDelta(), 0.05);
-      const elapsed = clock.getElapsedTime();
+      timer.update();
+      const delta = Math.min(timer.getDelta(), 0.05);
+      const elapsed = timer.getElapsed();
 
       // 1. WASD + Arrow + Q/E Smooth Camera Rig
       cameraRig.update(delta);
@@ -1096,7 +1098,7 @@ export function FullMotherboardLabCanvas({
         window.clearTimeout(frameId);
         frameId = 0;
       } else {
-        clock.getDelta();
+        timer.reset();
         forcePinSyncRef.current = true;
         if (!frameId) {
           tick();
@@ -1124,6 +1126,7 @@ export function FullMotherboardLabCanvas({
       disposed = true;
       window.cancelAnimationFrame(frameId);
       window.clearTimeout(frameId);
+      timer.dispose();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       resizeObserver.disconnect();
       cameraRig.dispose();

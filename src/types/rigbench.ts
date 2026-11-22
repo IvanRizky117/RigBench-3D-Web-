@@ -24,6 +24,7 @@ export type ClusterId =
 
 export type TheaterVisualType =
   | 'ipo-cycle'
+  | 'mainboard-15-tour'
   | 'chipset-bridge'
   | 'back-panel-map'
   | 'ram-notch-evolution'

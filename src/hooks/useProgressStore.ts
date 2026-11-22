@@ -200,6 +200,7 @@ export function useProgressStore() {
     setProgress(DEFAULT_PROGRESS);
     try {
       window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem('rigbench_completed_segments_v1');
     } catch {
       // Ignore storage error
     }

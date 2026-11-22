@@ -15,6 +15,20 @@ interface LectureTabProps {
   onNotify: (title: string, description: string, variant?: 'info' | 'success' | 'warning') => void;
 }
 
+const COMPLETED_SEGMENTS_KEY = 'rigbench_completed_segments_v1';
+
+function readCompletedSegments(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(COMPLETED_SEGMENTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 export function LectureTab({
   activeClusterId,
   onSelectCluster,
@@ -27,6 +41,7 @@ export function LectureTab({
     CURRICULUM_CLUSTERS.find((c) => c.id === activeClusterId) ?? CURRICULUM_CLUSTERS[0];
 
   const [segmentIndex, setSegmentIndex] = useState(0);
+  const [completedSegmentIds, setCompletedSegmentIds] = useState<string[]>(readCompletedSegments);
 
   useEffect(() => {
     setSegmentIndex(0);
@@ -35,8 +50,24 @@ export function LectureTab({
   const speech = useSpeechLecture({
     segments: cluster.segments,
     activeIndex: segmentIndex,
+    autoPlayNextOnComplete: true,
     onSegmentComplete: (nextIdx) => {
       setSegmentIndex(nextIdx);
+    },
+    onSegmentFinished: (finishedId) => {
+      setCompletedSegmentIds((prev) => {
+        if (prev.includes(finishedId)) return prev;
+        const next = [...prev, finishedId];
+        try {
+          window.localStorage.setItem(COMPLETED_SEGMENTS_KEY, JSON.stringify(next));
+        } catch {
+          // Ignore storage quota errors
+        }
+        return next;
+      });
+    },
+    onFallbackNotice: (reason) => {
+      onNotify('Mode Suara Lokal', reason, 'info');
     },
   });
 
@@ -49,6 +80,7 @@ export function LectureTab({
         {CURRICULUM_CLUSTERS.map((item) => {
           const active = item.id === cluster.id;
           const done = completedClusters.includes(item.id);
+          const doneCount = item.segments.filter((s) => completedSegmentIds.includes(s.id)).length;
           const totalSec = item.segments.reduce((acc, s) => acc + s.durationSec, 0);
           return (
             <button
@@ -69,8 +101,12 @@ export function LectureTab({
                 >
                   {item.number}
                 </span>
-                {done ? (
+                {done || (doneCount > 0 && doneCount === item.segments.length) ? (
                   <CheckCircle size={13} weight="fill" className="text-[#10B981]" />
+                ) : doneCount > 0 ? (
+                  <span className="font-mono text-[10px] font-semibold text-[#34D399] tabular-nums">
+                    {doneCount}/{item.segments.length}
+                  </span>
                 ) : (
                   <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-[#64748B] tabular-nums">
                     <Clock size={10} />
@@ -90,13 +126,13 @@ export function LectureTab({
         })}
       </div>
 
-      {/* Main Theater Motion-Lecture Stage (Dynamic Per-Cluster Scenery + Single-Line Subtitle) */}
+      {/* Main 3D Cinematic Hardware Theater Stage + Horizontal Sub-Chapter Strip */}
       <TheaterStagePlayer
-        clusterId={cluster.id}
         clusterTitle={cluster.title}
         clusterNumber={cluster.number}
         segments={cluster.segments}
         activeSegmentIndex={segmentIndex}
+        completedSegmentIds={completedSegmentIds}
         onSelectSegment={setSegmentIndex}
         speech={speech}
       />
