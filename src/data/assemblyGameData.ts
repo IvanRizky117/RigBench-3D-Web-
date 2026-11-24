@@ -87,10 +87,10 @@ export function getPracticeTargetGuideLabel(
       return 'Dudukan HDD 3.5" IDE';
     case 'install-ide-cable':
       return ideBoardConnected
-        ? 'Ujung 2: Port IDE 40-Pin HDD'
+        ? 'Ujung 2: Port IDE HDD · [R] Pin-1'
         : 'Ujung 1: #12 Port IDE Board [R]';
     case 'install-hdd-molex':
-      return 'Port Power Molex 4-Pin (PSU)';
+      return 'Molex 4-Pin HDD · [R] Bevel';
     case 'wire-hdd-led':
       return 'Blok Oranye Pin 1–3 [R]';
     case 'wire-pled-pos':
@@ -102,9 +102,9 @@ export function getPracticeTargetGuideLabel(
     case 'wire-power-sw':
       return 'Blok Merah Pin 6–8 (POWER)';
     case 'install-atx-24pin':
-      return '#14 Port Power ATX 24-Pin';
+      return '#14 ATX 24-Pin · [R] Klip';
     case 'install-atx-4pin':
-      return 'Port CPU ATX 4-Pin 12V';
+      return 'CPU ATX 4-Pin · [R] Klip';
     default:
       return null;
   }
@@ -327,7 +327,7 @@ export const STRICT_ASSEMBLY_ITEMS: AssemblyInventoryItem[] = [
     secondarySocketId: 'hdd-ide-port',
     targetSocketLabel: 'Ujung 1: #12 Port IDE Board → Ujung 2: Port IDE HDD',
     rulePrompt:
-      'Langkah 14 (HDD IDE 3/4 · Jalur Data): Tekan [R] sejajarkan garis merah Pin-1, klik/seret Ujung 1 ke #12 Port IDE biru lalu Ujung 2 ke Port IDE belakang HDD.',
+      'Langkah 14 (HDD IDE 3/4 · Jalur Data): Tekan [R] sejajarkan garis merah Pin-1 & tonjolan key di KEDUA ujung — pasang Ujung 1 ke #12 Port IDE biru lalu Ujung 2 ke Port IDE belakang HDD.',
     wrongOrderHint:
       'Urutan Storage IDE: Pasang Kabel Pita IDE 40-Wire (jalur data, 2 ujung) setelah Harddisk duduk di braket.',
     wrongSocketHint:
@@ -344,11 +344,12 @@ export const STRICT_ASSEMBLY_ITEMS: AssemblyInventoryItem[] = [
     targetSocketId: 'hdd-molex-port',
     targetSocketLabel: 'Port Power Molex 4-Pin Putih (Belakang Kanan HDD)',
     rulePrompt:
-      'Langkah 15 (HDD IDE 4/4 · Suplai Listrik): Pasang Kabel Power Molex 4-Pin dari PSU (Kuning 12V · Hitam · Merah 5V) ke soket putih kanan belakang HDD.',
+      'Langkah 15 (HDD IDE 4/4 · Suplai Listrik): Tekan [R] pastikan sisi miring D-Shape Molex menghadap atas (Kuning 12V di kiri), lalu tancapkan ke soket putih kanan belakang HDD.',
     wrongOrderHint:
       'Wajib Kelistrikan HDD IDE: Sambungkan Kabel Power Molex 4-Pin ke belakang kanan Harddisk agar motor piringan mendapat daya 12V & 5V!',
     wrongSocketHint: 'Arahkan konektor putih Molex 4-Pin ke port putih besar di sisi kanan belakang Harddisk 3.5".',
     successNote: 'Kabel Power Molex 4-Pin (Kuning-Hitam-Hitam-Merah) terkunci rapat — data IDE & listrik HDD lengkap!',
+    requiresRotation: true,
   },
   {
     id: 'wire-hdd-led',
@@ -442,11 +443,12 @@ export const STRICT_ASSEMBLY_ITEMS: AssemblyInventoryItem[] = [
     targetSocketId: 'atx-power',
     targetSocketLabel: '#14 Port Power ATX 24-Pin',
     rulePrompt:
-      'Langkah 21 (Daya 1/2): Pasang kabel daya utama PSU ATX 24-Pin ke #14 Port Power ATX putih di tepi bawah motherboard.',
+      'Langkah 21 (Daya 1/2): Tekan [R] sejajarkan klip pengunci samping ATX 24-Pin ke kait soket #14, lalu tancapkan hingga terkunci rapat.',
     wrongOrderHint:
       'Keamanan Kelistrikan STMIK AKI: Kabel daya ATX 24-Pin selalu dipasang setelah semua komponen & kabel sinyal F_PANEL tuntas!',
     wrongSocketHint: 'Arahkan ke #14 Port Power ATX 24-Pin berwarna putih panjang di sisi bawah motherboard.',
     successNote: 'Kabel daya utama ATX 24-Pin terkunci rapat di motherboard!',
+    requiresRotation: true,
   },
   {
     id: 'install-atx-4pin',
@@ -457,10 +459,11 @@ export const STRICT_ASSEMBLY_ITEMS: AssemblyInventoryItem[] = [
     targetSocketId: 'atx-4pin',
     targetSocketLabel: 'Port ATX 12V 4-Pin (Dekat VRM CPU)',
     rulePrompt:
-      'Langkah 22 (Daya 2/2 · Terakhir): Pasang kabel kuning-hitam CPU ATX 4-Pin 12V ke soket kotak putih 4-pin di pojok kanan atas dekat VRM CPU!',
+      'Langkah 22 (Daya 2/2 · Terakhir): Tekan [R] sejajarkan klip pengunci ATX 4-Pin 12V ke kait soket kotak putih dekat VRM CPU, lalu tancapkan!',
     wrongOrderHint:
       'Urutan Daya PSU: Sambungkan kabel daya tambahan CPU ATX 4-Pin 12V terakhir sebelum menyalakan PSU!',
     wrongSocketHint: 'Arahkan ke soket putih kotak 4-pin (ATX_12V) di dekat kapasitor VRM sisi kanan atas CPU.',
     successNote: 'Daya CPU 4-Pin 12V tersambung! Set saklar PSU ke 220V lalu tekan Power untuk Uji POST.',
+    requiresRotation: true,
   },
 ];

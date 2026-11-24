@@ -123,6 +123,7 @@ export function Theater3DStageCanvas({
     try {
       renderer = new THREE.WebGLRenderer({
         antialias: profile.antialias,
+        precision: profile.precision,
         alpha: false,
         powerPreference: profile.effectiveTier === 'low' ? 'default' : 'high-performance',
       });
@@ -282,8 +283,20 @@ export function Theater3DStageCanvas({
       frameId = window.setTimeout(poll, 8);
     };
 
+    let lastRenderAt = 0;
+    let cachedRadiusKfId = '';
+    let cachedFocusRadius = 0.85;
+
     const tick = () => {
       if (disposed || !inView || !docVisible) return;
+      if (!isSoftwareGl && profile.targetFps < 60) {
+        const frameNow = performance.now();
+        if (lastRenderAt > 0 && frameNow - lastRenderAt < 1000 / profile.targetFps - 1.5) {
+          frameId = window.requestAnimationFrame(tick);
+          return;
+        }
+        lastRenderAt = frameNow;
+      }
       timer.update();
       const dt = Math.min(timer.getDelta(), 0.05);
       const elapsed = timer.getElapsed();
@@ -378,18 +391,23 @@ export function Theater3DStageCanvas({
         dioramaBuilt.update(elapsed, dt, kf.mechAction, kf.anchor3D, kf.domainColor, playing);
       }
 
-      // 5. Resolve focus ring radius (explicit keyframe radius or fitted from studioMobo Box3)
-      let resolvedRadius = kf.focusRadius ?? 0.85;
-      if (
-        kf.focusRadius === undefined &&
-        studioMobo &&
-        kf.highlightId &&
-        studioMobo.componentGroups[kf.highlightId]
-      ) {
-        _compBox.setFromObject(studioMobo.componentGroups[kf.highlightId]);
-        _compBox.getSize(_compSize);
-        resolvedRadius = Math.max(0.35, Math.min(2.1, Math.max(_compSize.x, _compSize.z) * 0.56));
+      // 5. Resolve focus ring radius (cached per keyframe ID to avoid per-frame Box3 traversal)
+      if (kf.id !== cachedRadiusKfId) {
+        cachedRadiusKfId = kf.id;
+        if (kf.focusRadius !== undefined) {
+          cachedFocusRadius = kf.focusRadius;
+        } else if (studioMobo && kf.highlightId && studioMobo.componentGroups[kf.highlightId]) {
+          _compBox.setFromObject(studioMobo.componentGroups[kf.highlightId]);
+          _compBox.getSize(_compSize);
+          cachedFocusRadius = Math.max(
+            0.35,
+            Math.min(2.1, Math.max(_compSize.x, _compSize.z) * 0.56)
+          );
+        } else {
+          cachedFocusRadius = 0.85;
+        }
       }
+      const resolvedRadius = cachedFocusRadius;
 
       const markerState = focusMarker.update({
         elapsed,
@@ -447,6 +465,7 @@ export function Theater3DStageCanvas({
     const resumeIfActive = () => {
       if (!disposed && inView && docVisible && !frameId) {
         timer.reset();
+        lastRenderAt = 0;
         tick();
       }
     };

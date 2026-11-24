@@ -5,10 +5,24 @@ import {
   createFPanelLegendTexture,
   createHddLabelTexture,
   createHddRearLegendTexture,
-  createLga775PinGridTexture,
-  createProceduralPcbMaps,
   createWorkbenchMatTexture,
 } from '../../utils/pcbTextureGenerator';
+import {
+  createBrushedMetalTexture,
+  createCmosCoinTexture,
+  createMacroLga775GoldTexture,
+  createStudioPcbTextures,
+} from './studioMotherboardTextures';
+import {
+  buildHollowAtxConnector,
+  buildHollowCardSlot,
+  buildHollowSataPort,
+  buildHollowShroudedHeader,
+  buildMacroBackPanelParts,
+  buildNotchedCpuChip,
+  buildNotchedRamStick,
+  type GeometryTracker,
+} from './hardwareHollowGeometry';
 
 export interface AssemblyPartsRefs {
   cpuLever: THREE.Group;
@@ -105,11 +119,14 @@ export function buildProceduralMotherboard(
     return m;
   };
 
+  const tracker: GeometryTracker = { geo: trackGeo, mat: trackMat };
+  const _dummy = new THREE.Object3D();
+
   const rootGroup = new THREE.Group();
   const boardGroup = new THREE.Group();
   rootGroup.add(boardGroup);
 
-  // 1. Anti-Static Workbench Mat
+  // 1. Anti-Static Workbench Mat (preserved for authentic Lab 3D assembly desk)
   const matTex = createWorkbenchMatTexture(maxAnisotropy, textureScale);
   textures.push(matTex);
   const workbenchGeo = trackGeo(new THREE.BoxGeometry(20.5, 0.25, 15.2));
@@ -125,26 +142,26 @@ export function buildProceduralMotherboard(
   workbenchMesh.receiveShadow = true;
   rootGroup.add(workbenchMesh);
 
-  // 2. Main PCB Substrate (Adaptive 1024..2048 PBR Maps + Clearcoat Resin Solder Mask)
-  const pcbMaps = createProceduralPcbMaps(maxAnisotropy, textureScale);
+  // 2. Ultra-Detail Matte-Black Gold-Traced PCB Substrate + Brass Standoffs + 110 Micro SMDs
+  const pcbMaps = createStudioPcbTextures(maxAnisotropy, textureScale);
+  const brushedTex = createBrushedMetalTexture(maxAnisotropy);
+  textures.push(brushedTex);
+
   const pcbGeo = trackGeo(new THREE.BoxGeometry(10.0, 0.16, 8.4));
   const pcbTopMat = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      map: pcbMaps.albedoMap,
-      bumpMap: pcbMaps.bumpMap,
-      bumpScale: 0.028,
+    new THREE.MeshStandardMaterial({
+      map: pcbMaps.map,
+      ...(pcbMaps.bumpMap ? { bumpMap: pcbMaps.bumpMap, bumpScale: 0.018 } : {}),
       roughnessMap: pcbMaps.roughnessMap,
-      roughness: 0.36,
-      metalness: 0.14,
-      clearcoat: 0.48,
-      clearcoatRoughness: 0.24,
+      roughness: 0.72,
+      metalness: 0.28,
     })
   );
   const pcbEdgeMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0x1e2c3a,
-      roughness: 0.72,
-      metalness: 0.1,
+      color: 0x1b222c,
+      roughness: 0.65,
+      metalness: 0.2,
     })
   );
   const pcbMesh = new THREE.Mesh(pcbGeo, [
@@ -160,97 +177,228 @@ export function buildProceduralMotherboard(
   pcbMesh.receiveShadow = true;
   boardGroup.add(pcbMesh);
 
-  // Shared Blender-Grade PBR Materials
+  // Shared Studio PBR Materials
+  const cavityMat = trackMat(
+    new THREE.MeshStandardMaterial({ color: 0x030508, roughness: 0.96, metalness: 0.02 })
+  );
   const brushedAlumMat = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0xd4dbe6,
+    new THREE.MeshStandardMaterial({
+      color: 0xd4dbe4,
+      map: brushedTex,
       metalness: 0.92,
-      roughness: 0.24,
-      anisotropy: 0.65,
+      roughness: 0.26,
     })
   );
   const darkAnodizedMat = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0x263040,
-      metalness: 0.84,
+    new THREE.MeshStandardMaterial({
+      color: 0x262e3d,
+      map: brushedTex,
+      metalness: 0.85,
+      roughness: 0.34,
+    })
+  );
+  const goldAnodizedMat = trackMat(
+    new THREE.MeshStandardMaterial({
+      color: 0x8f7340,
+      map: brushedTex,
+      metalness: 0.86,
       roughness: 0.32,
     })
   );
   const steelMat = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0xc5cedb,
-      metalness: 0.94,
-      roughness: 0.18,
+    new THREE.MeshStandardMaterial({
+      color: 0xcbd5e1,
+      map: brushedTex,
+      metalness: 0.92,
+      roughness: 0.24,
     })
   );
   const goldMat = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0xeab308,
-      metalness: 0.96,
-      roughness: 0.14,
-      clearcoat: 0.32,
+    new THREE.MeshStandardMaterial({
+      color: 0xf4c430,
+      metalness: 0.94,
+      roughness: 0.22,
+    })
+  );
+  const brassMat = trackMat(
+    new THREE.MeshStandardMaterial({
+      color: 0xd9a441,
+      metalness: 0.9,
+      roughness: 0.26,
     })
   );
   const mattePlasticBlack = trackMat(
     new THREE.MeshStandardMaterial({
       color: 0x161b24,
-      roughness: 0.68,
-      metalness: 0.06,
+      roughness: 0.56,
+      metalness: 0.08,
     })
   );
   const mattePlasticIvory = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0xe2e8f0,
-      roughness: 0.58,
-      metalness: 0.04,
+      color: 0xd8dce3,
+      roughness: 0.5,
+      metalness: 0.06,
     })
   );
   const slotCyanMat = trackMat(
-    new THREE.MeshStandardMaterial({ color: 0x0e7490, roughness: 0.54, metalness: 0.08 })
+    new THREE.MeshStandardMaterial({ color: 0x0e7490, roughness: 0.48, metalness: 0.08 })
   );
   const slotOrangeMat = trackMat(
-    new THREE.MeshStandardMaterial({ color: 0xc2410c, roughness: 0.52, metalness: 0.08 })
+    new THREE.MeshStandardMaterial({ color: 0xc2410c, roughness: 0.48, metalness: 0.08 })
   );
   const slotAmberMat = trackMat(
-    new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.56, metalness: 0.08 })
+    new THREE.MeshStandardMaterial({ color: 0x6b3f1d, roughness: 0.52, metalness: 0.08 })
   );
   const slotBlueMat = trackMat(
-    new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.52, metalness: 0.08 })
+    new THREE.MeshStandardMaterial({ color: 0x173a5e, roughness: 0.5, metalness: 0.08 })
+  );
+  const hardRedPlastic = trackMat(
+    new THREE.MeshStandardMaterial({ color: 0x8b1e24, roughness: 0.48, metalness: 0.08 })
   );
   const darkIcMat = trackMat(
-    new THREE.MeshStandardMaterial({ color: 0x11151d, roughness: 0.5, metalness: 0.16 })
+    new THREE.MeshStandardMaterial({ color: 0x10141c, roughness: 0.42, metalness: 0.16 })
   );
   const copperMat = trackMat(
-    new THREE.MeshPhysicalMaterial({ color: 0xb87333, metalness: 0.92, roughness: 0.24 })
+    new THREE.MeshStandardMaterial({ color: 0xb87333, metalness: 0.92, roughness: 0.24 })
+  );
+  const redPin1StripMat = trackMat(
+    new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.45, metalness: 0.08 })
   );
 
-  // 3. #01 SOKET PROSESOR LGA 775 (775 Pin Grid + Hinged Load Plate + Curved Lever + CPU + Thermal Paste + Radial Heatsink/Fan)
+  // 9 Brass motherboard standoffs & stainless mounting screws
+  const mountCoords: Array<[number, number]> = [
+    [-4.65, -3.85],
+    [0.0, -3.85],
+    [4.65, -3.85],
+    [-4.65, 0.0],
+    [0.45, 0.25],
+    [4.65, 0.0],
+    [-4.65, 3.85],
+    [0.0, 3.85],
+    [4.65, 3.85],
+  ];
+  const standoffGeo = trackGeo(new THREE.CylinderGeometry(0.09, 0.09, 0.14, 6));
+  const screwHeadGeo = trackGeo(new THREE.CylinderGeometry(0.11, 0.11, 0.04, 16));
+  const standInst = new THREE.InstancedMesh(standoffGeo, brassMat, mountCoords.length);
+  const screwInst = new THREE.InstancedMesh(screwHeadGeo, steelMat, mountCoords.length);
+  mountCoords.forEach(([mx, mz], i) => {
+    _dummy.position.set(mx, -0.02, mz);
+    _dummy.rotation.set(0, 0, 0);
+    _dummy.scale.set(1, 1, 1);
+    _dummy.updateMatrix();
+    standInst.setMatrixAt(i, _dummy.matrix);
+
+    _dummy.position.set(mx, 0.18, mz);
+    _dummy.updateMatrix();
+    screwInst.setMatrixAt(i, _dummy.matrix);
+  });
+  standInst.instanceMatrix.needsUpdate = true;
+  standInst.computeBoundingSphere();
+  screwInst.instanceMatrix.needsUpdate = true;
+  screwInst.computeBoundingSphere();
+  boardGroup.add(standInst, screwInst);
+
+  // 110 Instanced Micro SMD Ceramic Capacitors & Resistors along copper buses
+  const smdBodyGeo = trackGeo(new THREE.BoxGeometry(0.09, 0.036, 0.048));
+  const smdMat = trackMat(
+    new THREE.MeshStandardMaterial({ color: 0x8b6239, roughness: 0.4, metalness: 0.25 })
+  );
+  const smdInst = new THREE.InstancedMesh(smdBodyGeo, smdMat, 110);
+  let smdIdx = 0;
+  const addSmdRow = (x0: number, z0: number, dx: number, dz: number, count: number, rotY = 0) => {
+    for (let i = 0; i < count && smdIdx < 110; i++) {
+      _dummy.position.set(x0 + dx * i, 0.178, z0 + dz * i);
+      _dummy.rotation.set(0, rotY, 0);
+      _dummy.scale.set(1, 1, 1);
+      _dummy.updateMatrix();
+      smdInst.setMatrixAt(smdIdx++, _dummy.matrix);
+    }
+  };
+  addSmdRow(0.95, -2.55, 0.16, 0, 14, Math.PI / 2);
+  addSmdRow(0.75, 0.45, 0.16, 0, 16, 0);
+  addSmdRow(-0.6, -2.2, 0, 0.17, 14, 0);
+  addSmdRow(-3.1, 0.2, 0.17, 0, 12, Math.PI / 2);
+  addSmdRow(-2.2, 1.85, 0.17, 0, 12, 0);
+  addSmdRow(0.25, 2.95, 0.18, 0, 14, Math.PI / 2);
+  addSmdRow(-4.1, -2.75, 0.17, 0, 12, 0);
+  addSmdRow(3.45, 0.1, 0, 0.18, 12, Math.PI / 2);
+  smdInst.count = smdIdx;
+  smdInst.instanceMatrix.needsUpdate = true;
+  smdInst.computeBoundingSphere();
+  boardGroup.add(smdInst);
+
+  // 3. #01 SOKET PROSESOR LGA 775 (Recessed 4-Wall Housing + 2 Keying Lugs + Macro Gold Pin Bed + Hinged Load Plate + Curved Lever + Notched CPU)
   const cpuGroup = new THREE.Group();
   cpuGroup.position.set(2.1, 0.16, -1.6);
   boardGroup.add(cpuGroup);
 
-  const socketBase = new THREE.Mesh(
-    trackGeo(new THREE.BoxGeometry(2.15, 0.12, 2.15)),
-    mattePlasticBlack
+  const sockSize = 1.94;
+  const sockWall = 0.14;
+  const sockH = 0.15;
+  const sockWallMat = trackMat(
+    new THREE.MeshStandardMaterial({ color: 0x20252e, roughness: 0.55, metalness: 0.12 })
   );
-  socketBase.position.y = 0.06;
-  socketBase.castShadow = true;
-  cpuGroup.add(socketBase);
+  const swX = trackGeo(new THREE.BoxGeometry(sockSize, sockH, sockWall));
+  const swZ = trackGeo(new THREE.BoxGeometry(sockWall, sockH, sockSize - sockWall * 2));
+  for (const s of [-1, 1]) {
+    const w1 = new THREE.Mesh(swX, sockWallMat);
+    w1.position.set(0, sockH / 2, s * (sockSize / 2 - sockWall / 2));
+    w1.castShadow = true;
+    cpuGroup.add(w1);
+    const w2 = new THREE.Mesh(swZ, sockWallMat);
+    w2.position.set(s * (sockSize / 2 - sockWall / 2), sockH / 2, 0);
+    w2.castShadow = true;
+    cpuGroup.add(w2);
+  }
 
-  const pinGridTex = createLga775PinGridTexture(maxAnisotropy);
+  // 2 Physical LGA 775 Inward Keying Lugs at z = -0.32 (matching notched CPU side cutouts!)
+  const keyLugGeo = trackGeo(new THREE.BoxGeometry(0.08, sockH * 0.85, 0.11));
+  for (const s of [-1, 1]) {
+    const lug = new THREE.Mesh(keyLugGeo, sockWallMat);
+    lug.position.set(s * 0.8, sockH * 0.45, -0.32);
+    cpuGroup.add(lug);
+  }
+
+  // Recessed Pin-1 gold indicator triangle printed on socket wall corner (-X, +Z)
+  const sockPin1Tri = new THREE.Mesh(trackGeo(new THREE.ConeGeometry(0.08, 0.02, 3)), goldMat);
+  sockPin1Tri.position.set(-0.88, sockH + 0.01, 0.88);
+  cpuGroup.add(sockPin1Tri);
+
+  // Deep recessed LGA 775 macro gold contact pin bed
+  const pinGridTex = createMacroLga775GoldTexture(maxAnisotropy, textureScale);
   textures.push(pinGridTex);
   const pinBed = new THREE.Mesh(
-    trackGeo(new THREE.BoxGeometry(1.56, 0.03, 1.56)),
+    trackGeo(new THREE.PlaneGeometry(1.66, 1.66)),
     trackMat(
-      new THREE.MeshPhysicalMaterial({
+      new THREE.MeshStandardMaterial({
         map: pinGridTex,
-        metalness: 0.72,
-        roughness: 0.34,
+        metalness: 0.88,
+        roughness: 0.24,
       })
     )
   );
-  pinBed.position.y = 0.125;
+  pinBed.rotation.x = -Math.PI / 2;
+  pinBed.position.y = 0.045;
   cpuGroup.add(pinBed);
+
+  // 4 Brass heatsink mounting through-holes around LGA 775
+  const holeRingGeo = trackGeo(new THREE.TorusGeometry(0.085, 0.024, 8, 16));
+  const holeBoreGeo = trackGeo(new THREE.CylinderGeometry(0.06, 0.06, 0.02, 12));
+  for (const [hx, hz] of [
+    [-1.22, -1.22],
+    [1.22, -1.22],
+    [-1.22, 1.22],
+    [1.22, 1.22],
+  ]) {
+    const ring = new THREE.Mesh(holeRingGeo, brassMat);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.set(hx, 0.015, hz);
+    cpuGroup.add(ring);
+    const bore = new THREE.Mesh(holeBoreGeo, cavityMat);
+    bore.position.set(hx, 0.012, hz);
+    cpuGroup.add(bore);
+  }
 
   // Hinged Steel Retention Load Plate
   const cpuRetentionPlate = new THREE.Group();
@@ -301,31 +449,28 @@ export function buildProceduralMotherboard(
   cpuLever.add(leverMesh);
   cpuGroup.add(cpuLever);
 
-  // CPU Chip (Green Substrate + Nickel-Plated IHS + Pin-1 Golden Triangle with Emerald Lock Glow)
-  const cpuChip = new THREE.Group();
-  const cpuSub = new THREE.Mesh(
-    trackGeo(new THREE.BoxGeometry(1.48, 0.055, 1.48)),
-    trackMat(new THREE.MeshStandardMaterial({ color: 0x0f5132, roughness: 0.44, metalness: 0.16 }))
-  );
-  cpuSub.position.y = 0.16;
-  const cpuIhs = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.22, 0.09, 1.22)), brushedAlumMat);
-  cpuIhs.position.y = 0.22;
-  cpuIhs.castShadow = true;
+  // Physically Notched LGA 775 CPU Chip (2 Side Key Cutouts + Chamfered Pin-1 Corner + Nickel IHS + Golden Triangle)
   const cpuAlignGlowMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0xeab308,
+      color: 0xf4c430,
       emissive: 0x10b981,
       emissiveIntensity: 0,
-      metalness: 0.78,
+      metalness: 0.82,
       roughness: 0.2,
     })
   );
-  const triMarker = new THREE.Mesh(trackGeo(new THREE.ConeGeometry(0.11, 0.03, 3)), cpuAlignGlowMat);
-  triMarker.position.set(-0.6, 0.198, 0.6);
-  cpuChip.add(cpuSub, cpuIhs, triMarker);
+  const cpuSubstrateMat = trackMat(
+    new THREE.MeshStandardMaterial({ color: 0x0f5132, roughness: 0.44, metalness: 0.16 })
+  );
+  const cpuChip = buildNotchedCpuChip(tracker, {
+    pcbMat: cpuSubstrateMat,
+    ihsMat: brushedAlumMat,
+    triMat: cpuAlignGlowMat,
+  });
+  cpuChip.position.y = 0.055;
   cpuGroup.add(cpuChip);
 
-  // Metallic Grey Thermal Paste Layer
+  // Metallic Grey Thermal Paste Layer seated right on top of CPU IHS
   const thermalPaste = new THREE.Mesh(
     trackGeo(new THREE.CylinderGeometry(0.36, 0.42, 0.035, 24)),
     trackMat(
@@ -337,12 +482,12 @@ export function buildProceduralMotherboard(
       })
     )
   );
-  thermalPaste.position.set(0, 0.275, 0);
+  thermalPaste.position.set(0, 0.205, 0);
   cpuGroup.add(thermalPaste);
 
   // CPU Heatsink + Spinning Aerodynamic Fan Rotor + 4 Corner Push-Pins + 4-Wire CPU_FAN Cable
   const cpuHeatsink = new THREE.Group();
-  cpuHeatsink.position.y = 0.29;
+  cpuHeatsink.position.y = 0.23;
   const hsCore = new THREE.Mesh(
     trackGeo(new THREE.CylinderGeometry(0.46, 0.46, 0.62, 24)),
     copperMat
@@ -472,7 +617,7 @@ export function buildProceduralMotherboard(
   cpuFanHeader.position.set(3.72, 0.26, -2.35);
   boardGroup.add(cpuFanHeader);
 
-  // 4. #02 SLOT MEMORI (4 DIMM Slots + Independent White End Clips + Separate Single-Stick RAM 1 & RAM 2)
+  // 4. #02 SLOT MEMORI (4x True Hollow DIMM Slots + Hooked White Clips + Physically Notched RAM 1 & RAM 2)
   const ramGroup = new THREE.Group();
   ramGroup.position.set(1.9, 0.16, 1.85);
   boardGroup.add(ramGroup);
@@ -482,28 +627,30 @@ export function buildProceduralMotherboard(
   const slotRightClips: THREE.Mesh[] = [];
 
   ramSlotZ.forEach((zPos, idx) => {
-    const slotMat = idx % 2 === 0 ? slotCyanMat : darkAnodizedMat;
-    const slotBody = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(4.2, 0.26, 0.17)), slotMat);
-    slotBody.position.set(0, 0.13, zPos);
-    slotBody.castShadow = true;
-    ramGroup.add(slotBody);
+    const builtSlot = buildHollowCardSlot(tracker, {
+      length: 4.16,
+      width: 0.24,
+      height: 0.25,
+      wallThickness: 0.048,
+      notchOffsetX: -0.35,
+      bodyMat: idx % 2 === 0 ? slotCyanMat : mattePlasticBlack,
+      cavityMat,
+      goldMat,
+      dividerMat: mattePlasticIvory,
+      latchMat: mattePlasticIvory,
+      dualLatch: true,
+      pinCount: 40,
+    });
+    builtSlot.group.position.set(0, 0, zPos);
+    ramGroup.add(builtSlot.group);
 
-    // Clear notch bridge inside slot
-    const notch = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.09, 0.29, 0.15)), mattePlasticIvory);
-    notch.position.set(-0.35, 0.145, zPos);
-    ramGroup.add(notch);
-
-    const clipGeo = trackGeo(new THREE.BoxGeometry(0.14, 0.38, 0.19));
-    clipGeo.translate(0, 0.19, 0);
-
-    const leftClip = new THREE.Mesh(clipGeo, mattePlasticIvory);
-    leftClip.position.set(-2.18, 0.02, zPos);
-    ramGroup.add(leftClip);
-
-    const rightClip = new THREE.Mesh(clipGeo, mattePlasticIvory);
-    rightClip.position.set(2.18, 0.02, zPos);
-    ramGroup.add(rightClip);
-
+    const leftClip = builtSlot.leftLatch!;
+    const rightClip = builtSlot.rightLatch!;
+    if (idx === 1 || idx === 3) {
+      // Unpopulated secondary slots stay visibly unlatched so hollow trough & pins read clearly
+      leftClip.rotation.z = 0.42;
+      rightClip.rotation.z = -0.42;
+    }
     slotLeftClips.push(leftClip);
     slotRightClips.push(rightClip);
   });
@@ -514,11 +661,10 @@ export function buildProceduralMotherboard(
   const ramClips2Right = slotRightClips[2];
 
   const ramPcbMat = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0x14532d,
-      roughness: 0.36,
-      metalness: 0.15,
-      clearcoat: 0.45,
+    new THREE.MeshStandardMaterial({
+      color: 0x0f2e1f,
+      roughness: 0.42,
+      metalness: 0.16,
     })
   );
 
@@ -539,135 +685,129 @@ export function buildProceduralMotherboard(
     })
   );
 
-  const buildRamStick = (zPos: number, glowMat: THREE.MeshStandardMaterial, accentTint: THREE.Material) => {
-    const stick = new THREE.Group();
-    stick.position.set(0, 0.44, zPos);
-    const body = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(4.06, 0.58, 0.06)), ramPcbMat);
-    body.castShadow = true;
-    const goldLeft = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.62, 0.1, 0.072)), goldMat);
-    goldLeft.position.set(-1.22, -0.25, 0);
-    const goldRight = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(2.3, 0.1, 0.072)), goldMat);
-    goldRight.position.set(0.86, -0.25, 0);
-    const spreader = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(4.08, 0.12, 0.095)), accentTint);
-    spreader.position.y = 0.25;
-    // Notch alignment indicator pip (glows bright emerald on lock!)
-    const notchPip = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.14, 0.16, 0.12)), glowMat);
-    notchPip.position.set(-0.35, 0.27, 0);
-    stick.add(body, goldLeft, goldRight, spreader, notchPip);
+  const ramStick1 = buildNotchedRamStick(tracker, {
+    length: 4.04,
+    height: 0.62,
+    notchX: -0.35,
+    pcbMat: ramPcbMat,
+    spreaderMat: darkAnodizedMat,
+    goldMat,
+    icMat: darkIcMat,
+    notchPipMat: ram1AlignGlowMat,
+  });
+  ramStick1.position.set(0, 0.035, -0.66);
 
-    for (let c = 0; c < 8; c++) {
-      const ic = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.32, 0.24, 0.098)), darkIcMat);
-      ic.position.set(-1.6 + c * 0.46, 0.01, 0);
-      stick.add(ic);
-    }
-    return stick;
-  };
-
-  const ramStick1 = buildRamStick(-0.66, ram1AlignGlowMat, brushedAlumMat);
-  const ramStick2 = buildRamStick(0.22, ram2AlignGlowMat, brushedAlumMat);
+  const ramStick2 = buildNotchedRamStick(tracker, {
+    length: 4.04,
+    height: 0.62,
+    notchX: -0.35,
+    pcbMat: ramPcbMat,
+    spreaderMat: brushedAlumMat,
+    goldMat,
+    icMat: darkIcMat,
+    notchPipMat: ram2AlignGlowMat,
+  });
+  ramStick2.position.set(0, 0.035, 0.22);
   ramGroup.add(ramStick1, ramStick2);
 
-  // 5. #03 NORTHBRIDGE (MCH) — Diagonal Extruded Fin Heatsink + Spring Screws
+  // 5. #03 NORTHBRIDGE (MCH) — Dark-Anodized Studio Fin Heatsink + Copper Heatpipe
   const nbGroup = new THREE.Group();
   nbGroup.position.set(0.1, 0.16, -0.8);
-  nbGroup.rotation.y = Math.PI / 4;
   boardGroup.add(nbGroup);
 
-  const nbBase = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.42, 0.16, 1.42)), brushedAlumMat);
+  const nbBase = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.18, 0.16, 1.18)), darkAnodizedMat);
   nbBase.position.y = 0.08;
   nbBase.castShadow = true;
   nbGroup.add(nbBase);
 
-  const nbFinShape = new THREE.Shape();
-  nbFinShape.moveTo(-0.68, 0);
-  nbFinShape.lineTo(0.68, 0);
-  nbFinShape.lineTo(0.62, 0.6);
-  nbFinShape.lineTo(-0.62, 0.6);
-  nbFinShape.closePath();
-  const nbFinGeo = trackGeo(
-    new THREE.ExtrudeGeometry(nbFinShape, {
-      depth: 0.042,
-      bevelEnabled: true,
-      bevelSize: 0.008,
-      bevelThickness: 0.008,
-    })
-  );
-  for (let i = 0; i < 10; i++) {
-    const fin = new THREE.Mesh(nbFinGeo, brushedAlumMat);
-    fin.position.set(0, 0.15, -0.62 + i * 0.135);
+  const nbFinGeo = trackGeo(new THREE.BoxGeometry(1.12, 0.42, 0.042));
+  for (let i = 0; i < 9; i++) {
+    const fin = new THREE.Mesh(nbFinGeo, i === 4 ? steelMat : darkAnodizedMat);
+    fin.position.set(0, 0.36, -0.48 + i * 0.12);
     fin.castShadow = true;
     nbGroup.add(fin);
   }
-  [
-    [-0.78, -0.78],
-    [0.78, 0.78],
-  ].forEach(([bx, bz]) => {
-    const screw = new THREE.Mesh(trackGeo(new THREE.CylinderGeometry(0.06, 0.06, 0.22, 12)), steelMat);
-    screw.position.set(bx, 0.11, bz);
-    nbGroup.add(screw);
-  });
+  const nbPipe = new THREE.Mesh(
+    trackGeo(new THREE.CylinderGeometry(0.055, 0.055, 1.24, 12)),
+    copperMat
+  );
+  nbPipe.rotation.z = Math.PI / 2;
+  nbPipe.position.set(0, 0.16, 0.56);
+  nbGroup.add(nbPipe);
 
-  // 6. #04 SOUTHBRIDGE (ICH) — Anodized Low-Profile Finned Heatsink
+  // 6. #04 SOUTHBRIDGE (ICH) — Low-Profile Gold-Anodized Finned Heatsink
   const sbGroup = new THREE.Group();
   sbGroup.position.set(-1.45, 0.16, 0.95);
   boardGroup.add(sbGroup);
 
-  const sbBase = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.22, 0.12, 1.22)), darkAnodizedMat);
+  const sbBase = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.06, 0.12, 1.06)), goldAnodizedMat);
   sbBase.position.y = 0.06;
   sbBase.castShadow = true;
   sbGroup.add(sbBase);
+  const sbFinGeo = trackGeo(new THREE.BoxGeometry(0.045, 0.24, 1.0));
   for (let i = 0; i < 8; i++) {
-    const fin = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.16, 0.28, 0.055)), brushedAlumMat);
-    fin.position.set(0, 0.24, -0.49 + i * 0.14);
+    const fin = new THREE.Mesh(sbFinGeo, goldAnodizedMat);
+    fin.position.set(-0.42 + i * 0.12, 0.22, 0);
     fin.castShadow = true;
     sbGroup.add(fin);
   }
 
-  // 7. EXPANSION SLOTS: #05 PCIe x16 (with hinged retention latch), #06 PCIe x1, #07 AGP, #08 PCI (×3)
-  const pcie16Group = new THREE.Group();
-  pcie16Group.position.set(-1.5, 0.16, -1.65);
-  const pcie16Body = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.24, 0.24, 3.05)), slotOrangeMat);
-  pcie16Body.position.y = 0.12;
-  pcie16Body.castShadow = true;
-  const pcieLatchGeo = trackGeo(new THREE.BoxGeometry(0.26, 0.34, 0.22));
-  pcieLatchGeo.translate(0, 0.17, 0);
-  const pcie16Latch = new THREE.Mesh(pcieLatchGeo, mattePlasticIvory);
-  pcie16Latch.position.set(0, 0.04, 1.56);
-  pcie16Group.add(pcie16Body, pcie16Latch);
-  boardGroup.add(pcie16Group);
+  // 7. EXPANSION SLOTS: #05 Hollow PCIe x16 (with hinged latch), #06 PCIe x1, #07 AGP, #08 PCI (×3)
+  const pcie16Built = buildHollowCardSlot(tracker, {
+    length: 2.96,
+    width: 0.24,
+    height: 0.24,
+    wallThickness: 0.048,
+    notchOffsetX: 0.76,
+    bodyMat: slotOrangeMat,
+    cavityMat,
+    goldMat,
+    latchMat: mattePlasticIvory,
+    rearTab: true,
+    rearTabSide: -1,
+    pinCount: 34,
+    rotateY: Math.PI / 2,
+  });
+  pcie16Built.group.position.set(-1.5, 0.16, -1.65);
+  const pcie16Latch = pcie16Built.rearTab!;
+  boardGroup.add(pcie16Built.group);
 
-  // Collision-Free Installable VGA Card (zero overlap with Back Panel I/O, PCIe latch, Northbridge, or Southbridge!)
+  // Collision-Free Installable VGA Card with REAL Split PCIe x16 Gold Fingers & Empty Keying Cutout!
+  // Seated at y = 0.20 world: gold tabs (local y = 0..0.20) sink flush inside hollow PCIe slot (world y = 0.16..0.40)!
   const vgaCard = new THREE.Group();
-  vgaCard.position.set(-1.5, 0.42, -1.68);
-  const vgaPcb = new THREE.Mesh(
-    trackGeo(new THREE.BoxGeometry(0.075, 0.9, 2.86)),
-    trackMat(
-      new THREE.MeshPhysicalMaterial({ color: 0x7f1d1d, roughness: 0.38, metalness: 0.15, clearcoat: 0.42 })
-    )
+  vgaCard.position.set(-1.5, 0.2, -1.65);
+  const vgaPcbMat = trackMat(
+    new THREE.MeshPhysicalMaterial({ color: 0x7f1d1d, roughness: 0.38, metalness: 0.15, clearcoat: 0.42 })
   );
-  vgaPcb.position.y = 0.45;
+  const vgaPcb = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.072, 0.9, 2.86)), vgaPcbMat);
+  vgaPcb.position.y = 0.67;
   vgaPcb.castShadow = true;
-  const vgaGoldPins = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.085, 0.12, 2.45)), goldMat);
-  vgaGoldPins.position.set(0, -0.02, 0.05);
+
+  // Split PCIe x16 Gold Edge Contact Banks wrapping cleanly around the physical notch bridge at local z = -0.76!
+  const vgaGoldRear = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.068, 0.22, 0.52)), goldMat);
+  vgaGoldRear.position.set(0, 0.11, -1.1);
+  const vgaGoldFront = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.068, 0.22, 2.02)), goldMat);
+  vgaGoldFront.position.set(0, 0.11, 0.33);
+
   const vgaShroud = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.22, 0.68, 2.25)), darkAnodizedMat);
-  vgaShroud.position.set(0.13, 0.44, 0.08);
+  vgaShroud.position.set(0.13, 0.66, 0.05);
   const vgaHeatpipe = new THREE.Mesh(
     trackGeo(new THREE.CylinderGeometry(0.03, 0.03, 2.15, 12)),
     copperMat
   );
   vgaHeatpipe.rotation.x = Math.PI / 2;
-  vgaHeatpipe.position.set(0.13, 0.84, 0.08);
+  vgaHeatpipe.position.set(0.13, 1.06, 0.05);
   const vgaFan = new THREE.Mesh(trackGeo(new THREE.CylinderGeometry(0.29, 0.29, 0.07, 22)), brushedAlumMat);
   vgaFan.rotation.z = Math.PI / 2;
-  vgaFan.position.set(0.245, 0.44, 0.18);
+  vgaFan.position.set(0.245, 0.66, 0.15);
   const vgaBracket = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.26, 1.04, 0.05)), steelMat);
-  vgaBracket.position.set(0.04, 0.46, -1.46);
+  vgaBracket.position.set(0.04, 0.68, -1.49);
   const vgaBracketTab = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.28, 0.05, 0.22)), steelMat);
-  vgaBracketTab.position.set(-0.08, 0.96, -1.46);
+  vgaBracketTab.position.set(-0.08, 1.18, -1.49);
 
   // Interactive VGA Bracket Thumbscrew (clicks to tighten down onto the bracket tab!)
   const vgaBracketScrew = new THREE.Group();
-  vgaBracketScrew.position.set(-0.1, 1.03, -1.46);
+  vgaBracketScrew.position.set(-0.1, 1.25, -1.49);
   const vgaScrewGlowMat = trackMat(
     new THREE.MeshStandardMaterial({
       color: 0xe2e8f0,
@@ -687,13 +827,14 @@ export function buildProceduralMotherboard(
   vgaBracketScrew.add(screwHead, screwCross1, screwCross2, screwShaft);
 
   const vgaScrewHitbox = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.54, 0.56, 0.54)), heatsinkPinHitboxMat);
-  vgaScrewHitbox.position.set(-0.1, 1.04, -1.46);
+  vgaScrewHitbox.position.set(-0.1, 1.26, -1.49);
   vgaScrewHitbox.userData.componentId = 'vga-screw';
   vgaScrewHitbox.layers.set(1);
 
   vgaCard.add(
     vgaPcb,
-    vgaGoldPins,
+    vgaGoldRear,
+    vgaGoldFront,
     vgaShroud,
     vgaHeatpipe,
     vgaFan,
@@ -704,116 +845,158 @@ export function buildProceduralMotherboard(
   );
   boardGroup.add(vgaCard);
 
-  // #06 PCIe x1
-  const pcie1 = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.2, 0.22, 0.85)), mattePlasticIvory);
-  pcie1.position.set(-2.4, 0.27, -2.5);
-  pcie1.castShadow = true;
-  boardGroup.add(pcie1);
+  // #06 Hollow PCIe x1
+  const pcie1Built = buildHollowCardSlot(tracker, {
+    length: 0.92,
+    width: 0.22,
+    height: 0.22,
+    wallThickness: 0.045,
+    notchFrac: 0.56,
+    bodyMat: mattePlasticBlack,
+    cavityMat,
+    goldMat,
+    pinCount: 12,
+    rotateY: Math.PI / 2,
+  });
+  pcie1Built.group.position.set(-2.4, 0.16, -2.5);
+  boardGroup.add(pcie1Built.group);
 
-  // #07 AGP Slot
-  const agpMesh = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.24, 0.24, 2.45)), slotAmberMat);
-  agpMesh.position.set(-2.7, 0.28, -1.2);
-  agpMesh.castShadow = true;
-  boardGroup.add(agpMesh);
+  // #07 Hollow AGP Slot (Brown)
+  const agpBuilt = buildHollowCardSlot(tracker, {
+    length: 2.38,
+    width: 0.24,
+    height: 0.23,
+    wallThickness: 0.048,
+    notchFrac: 0.36,
+    bodyMat: slotAmberMat,
+    cavityMat,
+    goldMat,
+    latchMat: slotAmberMat,
+    rearTab: true,
+    rearTabSide: -1,
+    pinCount: 28,
+    rotateY: Math.PI / 2,
+  });
+  agpBuilt.group.position.set(-2.7, 0.16, -1.2);
+  boardGroup.add(agpBuilt.group);
 
-  // #08 PCI Slots (3 Ivory Slots)
+  // #08 Hollow PCI Slots (3 Ivory Slots)
   [-3.45, -3.88, -4.31].forEach((xPos) => {
-    const pci = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.24, 0.24, 2.7)), mattePlasticIvory);
-    pci.position.set(xPos, 0.28, -1.35);
-    pci.castShadow = true;
-    boardGroup.add(pci);
+    const pciBuilt = buildHollowCardSlot(tracker, {
+      length: 2.65,
+      width: 0.24,
+      height: 0.22,
+      wallThickness: 0.048,
+      notchFrac: 0.72,
+      bodyMat: mattePlasticIvory,
+      cavityMat,
+      goldMat,
+      pinCount: 30,
+      rotateY: Math.PI / 2,
+    });
+    pciBuilt.group.position.set(xPos, 0.16, -1.35);
+    boardGroup.add(pciBuilt.group);
   });
 
-  // 8. #09 ROM BIOS Chip
+  // 8. #09 ROM BIOS Chip (Socket + Epoxy IC + Pin-1 Gold Dot + Gull-Wing Legs)
   const biosGroup = new THREE.Group();
   biosGroup.position.set(-3.75, 0.16, 1.2);
-  const biosSocket = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.68, 0.1, 0.68)), mattePlasticBlack);
+  const biosSocket = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.62, 0.1, 0.88)), mattePlasticBlack);
   biosSocket.position.y = 0.05;
-  const biosChip = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.56, 0.14, 0.56)), darkIcMat);
-  biosChip.position.y = 0.12;
-  const biosLabel = new THREE.Mesh(
-    trackGeo(new THREE.BoxGeometry(0.36, 0.01, 0.2)),
-    trackMat(new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.4, metalness: 0.2 }))
-  );
-  biosLabel.position.y = 0.195;
-  biosGroup.add(biosSocket, biosChip, biosLabel);
+  const biosChip = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.46, 0.1, 0.72)), darkIcMat);
+  biosChip.position.y = 0.11;
+  biosChip.castShadow = true;
+  const biosDot = new THREE.Mesh(trackGeo(new THREE.CylinderGeometry(0.038, 0.038, 0.015, 12)), goldMat);
+  biosDot.position.set(-0.14, 0.162, -0.24);
+  const legGeo = trackGeo(new THREE.BoxGeometry(0.07, 0.06, 0.025));
+  for (let i = 0; i < 8; i++) {
+    for (const s of [-1, 1]) {
+      const leg = new THREE.Mesh(legGeo, steelMat);
+      leg.position.set(s * 0.25, 0.08, -0.28 + i * 0.08);
+      biosGroup.add(leg);
+    }
+  }
+  biosGroup.add(biosSocket, biosChip, biosDot);
   boardGroup.add(biosGroup);
 
-  // 9. #10 BATERAI CMOS CR2032
+  // 9. #10 BATERAI CMOS CR2032 (Hollow Molded Holder + Brushed Chrome Coin Texture + Spring Clip)
   const cmosGroup = new THREE.Group();
   cmosGroup.position.set(-1.4, 0.16, 2.35);
-  const cmosHolder = new THREE.Mesh(
-    trackGeo(new THREE.CylinderGeometry(0.47, 0.47, 0.12, 28)),
+  const cmosRing = new THREE.Mesh(
+    trackGeo(new THREE.CylinderGeometry(0.45, 0.45, 0.15, 28, 1, true)),
     mattePlasticBlack
   );
-  cmosHolder.position.y = 0.06;
-  const cmosSpring = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.18, 0.05, 0.18)), steelMat);
-  cmosSpring.position.set(0.42, 0.16, 0);
-  const cmosCoin = new THREE.Mesh(
-    trackGeo(new THREE.CylinderGeometry(0.38, 0.38, 0.09, 32)),
-    trackMat(
-      new THREE.MeshPhysicalMaterial({
-        color: 0xf1f5f9,
-        metalness: 0.96,
-        roughness: 0.12,
-        clearcoat: 0.6,
-        anisotropy: 0.5,
-      })
-    )
+  cmosRing.position.y = 0.075;
+  const cmosBase = new THREE.Mesh(
+    trackGeo(new THREE.CylinderGeometry(0.45, 0.45, 0.04, 28)),
+    cavityMat
   );
-  cmosCoin.position.y = 0.135;
+  cmosBase.position.y = 0.02;
+  const cmosSpring = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.18, 0.04, 0.16)), steelMat);
+  cmosSpring.position.set(0.38, 0.155, 0);
+  const coinTex = createCmosCoinTexture(maxAnisotropy);
+  textures.push(coinTex);
+  const coinTopMat = trackMat(
+    new THREE.MeshStandardMaterial({ map: coinTex, metalness: 0.94, roughness: 0.18 })
+  );
+  const cmosCoin = new THREE.Mesh(
+    trackGeo(new THREE.CylinderGeometry(0.37, 0.37, 0.09, 28)),
+    [steelMat, coinTopMat, steelMat]
+  );
+  cmosCoin.position.y = 0.095;
   cmosCoin.castShadow = true;
-  cmosGroup.add(cmosHolder, cmosSpring, cmosCoin);
+  cmosGroup.add(cmosRing, cmosBase, cmosSpring, cmosCoin);
   boardGroup.add(cmosGroup);
 
-  // 10. #11 PORT SATA (4 Red Angled Ports) + Installable Red SATA Cable
+  // 10. #11 PORT SATA (4x Authentic Hollow L-Shaped SATA Ports with 7 Gold Contacts Each)
   const sataGroup = new THREE.Group();
   sataGroup.position.set(-2.65, 0.16, 2.5);
-  const sataMat = trackMat(new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.44, metalness: 0.1 }));
-  [
-    [-0.36, -0.2],
-    [0.36, -0.2],
-    [-0.36, 0.25],
-    [0.36, 0.25],
-  ].forEach(([sx, sz]) => {
-    const port = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.56, 0.24, 0.24)), sataMat);
-    port.position.set(sx, 0.12, sz);
-    port.castShadow = true;
+  (
+    [
+      [-0.32, -0.18, true],
+      [0.32, -0.18, true],
+      [-0.32, 0.18, false],
+      [0.32, 0.18, false],
+    ] as Array<[number, number, boolean]>
+  ).forEach(([sx, sz, isRed]) => {
+    const port = buildHollowSataPort(
+      tracker,
+      isRed ? hardRedPlastic : mattePlasticBlack,
+      cavityMat,
+      goldMat
+    );
+    port.position.set(sx, 0, sz);
     sataGroup.add(port);
   });
   boardGroup.add(sataGroup);
 
-  // 11. #12 PORT IDE (40-Pin Blue Header with Dual-Row Gold Pins) + #13 FLOPPY (34-Pin Dual-Row Gold Pins)
-  const ideGroup = new THREE.Group();
+  // 11. #12 PORT IDE (Hollow 40-Pin Blue Shroud + Center Key Cutout + Red Pin-1 Strip + 39 Standing Brass Pins)
+  const ideGroup = buildHollowShroudedHeader(tracker, {
+    cols: 20,
+    length: 1.96,
+    width: 0.34,
+    height: 0.3,
+    shroudMat: slotBlueMat,
+    cavityMat,
+    brassMat,
+    pin1MarkMat: redPin1StripMat,
+    pin1Side: 1,
+  });
   ideGroup.position.set(-0.85, 0.16, 3.45);
-  const ideShell = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.82, 0.26, 0.36)), slotBlueMat);
-  ideShell.position.y = 0.13;
-  ideShell.castShadow = true;
-  ideGroup.add(ideShell);
-  const idePinGeo = trackGeo(new THREE.CylinderGeometry(0.014, 0.014, 0.2, 6));
-  for (let p = 0; p < 18; p++) {
-    for (const rowZ of [-0.06, 0.06]) {
-      const pin = new THREE.Mesh(idePinGeo, goldMat);
-      pin.position.set(-0.78 + p * 0.092, 0.21, rowZ);
-      ideGroup.add(pin);
-    }
-  }
   boardGroup.add(ideGroup);
 
-  // #13 PORT FLOPPY (34-Pin Ivory Header with Dual-Row Gold Pins)
-  const floppyGroup = new THREE.Group();
+  // #13 PORT FLOPPY (Hollow 34-Pin Ivory Shroud + Center Key Cutout + 34 Standing Brass Pins)
+  const floppyGroup = buildHollowShroudedHeader(tracker, {
+    cols: 17,
+    length: 1.56,
+    width: 0.32,
+    height: 0.28,
+    shroudMat: mattePlasticIvory,
+    cavityMat,
+    brassMat,
+  });
   floppyGroup.position.set(-4.2, 0.16, 2.55);
-  const floppyMesh = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.34, 0.26, 1.52)), mattePlasticIvory);
-  floppyMesh.position.y = 0.13;
-  floppyMesh.castShadow = true;
-  floppyGroup.add(floppyMesh);
-  for (let p = 0; p < 14; p++) {
-    for (const rowX of [-0.055, 0.055]) {
-      const pin = new THREE.Mesh(idePinGeo, goldMat);
-      pin.position.set(rowX, 0.21, -0.62 + p * 0.095);
-      floppyGroup.add(pin);
-    }
-  }
+  floppyGroup.rotation.y = Math.PI / 2;
   boardGroup.add(floppyGroup);
 
   // 11b. AUTHENTIC OLD 3.5" IDE (PATA) HARDDISK + ROOMY DESK BRACKET (z=6.25)
@@ -884,21 +1067,33 @@ export function buildProceduralMotherboard(
     new THREE.MeshStandardMaterial({ color: 0xf1f5f9, emissive: 0x22d3ee, emissiveIntensity: 0, roughness: 0.48 })
   );
 
-  // (a) Rear Left (local x = -0.58): 40-Pin IDE Data Connector + Gold Pins + Red Pin-1 Key Marker
-  const hddIdeSocket = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.22, 0.24, 0.16)), hddRearIdeGlowMat);
-  hddIdeSocket.position.set(-0.58, 0.22, -0.89);
-  hddUnitGroup.add(hddIdeSocket);
+  // (a) Rear Left (local x = -0.58): True Hollow 40-Pin IDE Shroud + Top Key Notch Cutout + Brass Pins + Red Pin-1 Marker
+  const hddIdeCavity = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.14, 0.18, 0.05)), cavityMat);
+  hddIdeCavity.position.set(-0.58, 0.22, -0.87);
+  hddUnitGroup.add(hddIdeCavity);
+  const hddIdeBotWall = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.22, 0.036, 0.18)), hddRearIdeGlowMat);
+  hddIdeBotWall.position.set(-0.58, 0.115, -0.92);
+  const hddIdeTopL = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.51, 0.036, 0.18)), hddRearIdeGlowMat);
+  hddIdeTopL.position.set(-0.935, 0.325, -0.92);
+  const hddIdeTopR = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.51, 0.036, 0.18)), hddRearIdeGlowMat);
+  hddIdeTopR.position.set(-0.225, 0.325, -0.92);
+  const hddIdeSideL = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.038, 0.24, 0.18)), hddRearIdeGlowMat);
+  hddIdeSideL.position.set(-1.17, 0.22, -0.92);
+  const hddIdeSideR = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.038, 0.24, 0.18)), hddRearIdeGlowMat);
+  hddIdeSideR.position.set(0.01, 0.22, -0.92);
+  hddUnitGroup.add(hddIdeBotWall, hddIdeTopL, hddIdeTopR, hddIdeSideL, hddIdeSideR);
   const hddIdePin1Mark = new THREE.Mesh(
-    trackGeo(new THREE.BoxGeometry(0.06, 0.24, 0.17)),
-    trackMat(new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.45 }))
+    trackGeo(new THREE.BoxGeometry(0.055, 0.24, 0.19)),
+    redPin1StripMat
   );
-  hddIdePin1Mark.position.set(-0.01, 0.22, -0.89);
+  hddIdePin1Mark.position.set(0.015, 0.22, -0.92);
   hddUnitGroup.add(hddIdePin1Mark);
+  const hddIdePinGeo = trackGeo(new THREE.CylinderGeometry(0.011, 0.011, 0.15, 6));
   for (let p = 0; p < 12; p++) {
     for (const rowY of [0.175, 0.265]) {
-      const pin = new THREE.Mesh(trackGeo(new THREE.CylinderGeometry(0.011, 0.011, 0.16, 6)), goldMat);
+      const pin = new THREE.Mesh(hddIdePinGeo, brassMat);
       pin.rotation.x = Math.PI / 2;
-      pin.position.set(-1.1 + p * 0.092, rowY, -0.94);
+      pin.position.set(-1.08 + p * 0.092, rowY, -0.94);
       hddUnitGroup.add(pin);
     }
   }
@@ -970,16 +1165,23 @@ export function buildProceduralMotherboard(
   hddJumperCap.position.set(0.14, 0.22, -0.99);
   hddUnitGroup.add(hddJumperCap);
 
-  // (c) Rear Far-Right (local x = +0.96): Authentic White D-Shaped 4-Pin Molex Power Connector
-  const molexShroud = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.56, 0.24, 0.18)), hddRearMolexGlowMat);
-  molexShroud.position.set(0.96, 0.22, -0.89);
-  const molexBevel = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.44, 0.05, 0.17)), hddRearMolexGlowMat);
-  molexBevel.position.set(0.96, 0.355, -0.89);
-  hddUnitGroup.add(molexShroud, molexBevel);
+  // (c) Rear Far-Right (local x = +0.96): True Hollow White D-Shaped 4-Pin Molex Power Connector
+  const molexCavity = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.5, 0.18, 0.05)), cavityMat);
+  molexCavity.position.set(0.96, 0.22, -0.87);
+  const molexBotWall = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.58, 0.036, 0.2)), hddRearMolexGlowMat);
+  molexBotWall.position.set(0.96, 0.115, -0.92);
+  const molexTopBevel = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.46, 0.048, 0.2)), hddRearMolexGlowMat);
+  molexTopBevel.position.set(0.96, 0.33, -0.92);
+  const molexSideL = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.04, 0.23, 0.2)), hddRearMolexGlowMat);
+  molexSideL.position.set(0.69, 0.22, -0.92);
+  const molexSideR = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.04, 0.23, 0.2)), hddRearMolexGlowMat);
+  molexSideR.position.set(1.23, 0.22, -0.92);
+  hddUnitGroup.add(molexCavity, molexBotWall, molexTopBevel, molexSideL, molexSideR);
+  const molexPinGeo = trackGeo(new THREE.CylinderGeometry(0.025, 0.025, 0.17, 8));
   for (let m = 0; m < 4; m++) {
-    const mp = new THREE.Mesh(trackGeo(new THREE.CylinderGeometry(0.026, 0.026, 0.18, 8)), goldMat);
+    const mp = new THREE.Mesh(molexPinGeo, brassMat);
     mp.rotation.x = Math.PI / 2;
-    mp.position.set(0.79 + m * 0.112, 0.22, -0.94);
+    mp.position.set(0.79 + m * 0.112, 0.22, -0.95);
     hddUnitGroup.add(mp);
   }
   // Generous expanded hitbox so Molex 4-Pin clicks & drops effortlessly!
@@ -991,10 +1193,12 @@ export function buildProceduralMotherboard(
   const redStripeMat = trackMat(new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.48 }));
 
   const ideRibbonPartial = new THREE.Group();
-  const idePlugBoardPart = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.74, 0.22, 0.26)), mattePlasticBlack);
-  idePlugBoardPart.position.set(-0.85, 0.48, 3.45);
+  const idePlugBoardPart = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.86, 0.24, 0.24)), mattePlasticBlack);
+  idePlugBoardPart.position.set(-0.85, 0.42, 3.45);
+  const ideKeyBumpPart = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.18, 0.2, 0.06)), mattePlasticBlack);
+  ideKeyBumpPart.position.set(-0.85, 0.4, 3.59);
   const idePartialCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-0.85, 0.56, 3.45),
+    new THREE.Vector3(-0.85, 0.52, 3.45),
     new THREE.Vector3(-1.35, 1.04, 4.05),
     new THREE.Vector3(-1.82, 0.88, 4.65),
   ]);
@@ -1009,15 +1213,19 @@ export function buildProceduralMotherboard(
   }
   const ideLoosePlug = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.22, 0.22, 0.18)), mattePlasticBlack);
   ideLoosePlug.position.set(-1.82, 0.82, 4.68);
-  ideRibbonPartial.add(idePlugBoardPart, ideLoosePlug);
+  ideRibbonPartial.add(idePlugBoardPart, ideKeyBumpPart, ideLoosePlug);
   ideRibbonPartial.visible = false;
   boardGroup.add(ideRibbonPartial);
 
   const ideRibbonCable = new THREE.Group();
-  const idePlugBoard = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.74, 0.22, 0.26)), mattePlasticBlack);
-  idePlugBoard.position.set(-0.85, 0.48, 3.45);
-  const idePlugHdd = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.24, 0.24, 0.2)), mattePlasticBlack);
+  const idePlugBoard = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.86, 0.24, 0.24)), mattePlasticBlack);
+  idePlugBoard.position.set(-0.85, 0.42, 3.45);
+  const ideKeyBumpBoard = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.18, 0.2, 0.06)), mattePlasticBlack);
+  ideKeyBumpBoard.position.set(-0.85, 0.4, 3.59);
+  const idePlugHdd = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.16, 0.2, 0.22)), mattePlasticBlack);
   idePlugHdd.position.set(-1.93, 0.28, 5.29);
+  const ideKeyBumpHdd = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.16, 0.05, 0.18)), mattePlasticBlack);
+  ideKeyBumpHdd.position.set(-1.93, 0.39, 5.29);
 
   const ideRibbonCurve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(-0.85, 0.56, 3.45),
@@ -1040,7 +1248,7 @@ export function buildProceduralMotherboard(
     );
     ideRibbonCable.add(strand);
   }
-  ideRibbonCable.add(idePlugBoard, idePlugHdd);
+  ideRibbonCable.add(idePlugBoard, ideKeyBumpBoard, idePlugHdd, ideKeyBumpHdd);
   boardGroup.add(ideRibbonCable);
 
   // Authentic 4-Pin PSU Molex Power Cable (White D-Shape Head + Yellow 12V, Black GND, Black GND, Red 5V -> Rear Right HDD!)
@@ -1065,36 +1273,34 @@ export function buildProceduralMotherboard(
   });
   boardGroup.add(hddMolexCable);
 
-  // 12. #14 PORT POWER ATX 24-PIN + SEPARATE ATX 12V 4-PIN CPU POWER
-  const atxGroup = new THREE.Group();
+  // 12. #14 PORT POWER ATX 24-PIN (24 Individual Hollow Square Cells) + ATX 12V 4-PIN (4 Hollow Square Cells)
+  const atxGroup = buildHollowAtxConnector(tracker, 12, 2, mattePlasticIvory, cavityMat, brassMat, 0.145);
   atxGroup.position.set(1.55, 0.16, 3.45);
-  const atx24 = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.88, 0.34, 0.42)), mattePlasticIvory);
-  atx24.position.y = 0.17;
-  atx24.castShadow = true;
-  atxGroup.add(atx24);
   boardGroup.add(atxGroup);
 
   const atx4PinGlowMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0xe2e8f0,
+      color: 0xd8dce3,
       emissive: 0x22d3ee,
       emissiveIntensity: 0,
-      roughness: 0.52,
+      roughness: 0.5,
     })
   );
-  const atx4Pin = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.44, 0.34, 0.44)), atx4PinGlowMat);
-  atx4Pin.position.set(4.1, 0.33, -2.5);
+  const atx4Pin = buildHollowAtxConnector(tracker, 2, 2, atx4PinGlowMat, cavityMat, brassMat, 0.18);
+  atx4Pin.position.set(4.1, 0.16, -2.5);
   boardGroup.add(atx4Pin);
 
-  // Split Bundle 1: ATX 24-Pin Mainboard Harness
+  // Split Bundle 1: ATX 24-Pin Mainboard Harness (with front +Z locking clip!)
   const atx24CableBundle = new THREE.Group();
-  const atx24Plug = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.86, 0.26, 0.38)), mattePlasticIvory);
-  atx24Plug.position.set(1.55, 0.52, 3.45);
-  atx24CableBundle.add(atx24Plug);
+  const atx24Plug = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.78, 0.26, 0.34)), mattePlasticIvory);
+  atx24Plug.position.set(1.55, 0.48, 3.45);
+  const atx24PlugClip = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.32, 0.22, 0.06)), mattePlasticIvory);
+  atx24PlugClip.position.set(1.55, 0.46, 3.65);
+  atx24CableBundle.add(atx24Plug, atx24PlugClip);
   const atxColors = [0xf97316, 0xef4444, 0xeab308, 0x10b981, 0x111827, 0xa855f7];
   atxColors.forEach((col, i) => {
     const wireCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0.85 + i * 0.26, 0.58, 3.45),
+      new THREE.Vector3(0.85 + i * 0.26, 0.56, 3.45),
       new THREE.Vector3(1.1 + i * 0.22, 1.15, 4.15),
       new THREE.Vector3(2.2 + i * 0.12, 0.85, 4.95),
       new THREE.Vector3(3.4 + i * 0.08, 0.26, 5.45),
@@ -1107,11 +1313,13 @@ export function buildProceduralMotherboard(
   });
   boardGroup.add(atx24CableBundle);
 
-  // Split Bundle 2: ATX 12V 4-Pin CPU Power Harness
+  // Split Bundle 2: ATX 12V 4-Pin CPU Power Harness (with front +Z locking clip!)
   const atx4CableBundle = new THREE.Group();
-  const atx4Plug = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.42, 0.26, 0.42)), mattePlasticIvory);
-  atx4Plug.position.set(4.1, 0.55, -2.5);
-  atx4CableBundle.add(atx4Plug);
+  const atx4Plug = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.4, 0.26, 0.4)), mattePlasticIvory);
+  atx4Plug.position.set(4.1, 0.49, -2.5);
+  const atx4PlugClip = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.2, 0.22, 0.06)), mattePlasticIvory);
+  atx4PlugClip.position.set(4.1, 0.47, -2.27);
+  atx4CableBundle.add(atx4Plug, atx4PlugClip);
   [
     [0xeab308, -0.09, -0.09],
     [0xeab308, 0.09, -0.09],
@@ -1119,7 +1327,7 @@ export function buildProceduralMotherboard(
     [0x111827, 0.09, 0.09],
   ].forEach(([col, ox, oz]) => {
     const cpuPwrCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(4.1 + (ox as number), 0.62, -2.5 + (oz as number)),
+      new THREE.Vector3(4.1 + (ox as number), 0.58, -2.5 + (oz as number)),
       new THREE.Vector3(4.85, 0.96, -2.35 + (oz as number)),
       new THREE.Vector3(5.55, 0.24, -1.75 + (oz as number)),
     ]);
@@ -1131,101 +1339,28 @@ export function buildProceduralMotherboard(
   });
   boardGroup.add(atx4CableBundle);
 
-  // 13. #15–#24 BACK PANEL I/O SHIELD
-  const backPanelGroup = new THREE.Group();
-  backPanelGroup.position.set(0, 0.16, -3.72);
-  boardGroup.add(backPanelGroup);
-
-  const ioBacking = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(7.2, 0.96, 0.68)), brushedAlumMat);
-  ioBacking.position.set(0.25, 0.48, 0);
-  ioBacking.castShadow = true;
-  backPanelGroup.add(ioBacking);
-
-  const ps2Mouse = new THREE.Mesh(
-    trackGeo(new THREE.CylinderGeometry(0.17, 0.17, 0.24, 18)),
-    trackMat(new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.42 }))
-  );
-  ps2Mouse.rotation.x = Math.PI / 2;
-  ps2Mouse.position.set(3.35, 0.66, -0.34);
-
-  const ps2Kb = new THREE.Mesh(
-    trackGeo(new THREE.CylinderGeometry(0.17, 0.17, 0.24, 18)),
-    trackMat(new THREE.MeshStandardMaterial({ color: 0x9333ea, roughness: 0.42 }))
-  );
-  ps2Kb.rotation.x = Math.PI / 2;
-  ps2Kb.position.set(3.35, 0.28, -0.34);
-
-  const parallelMesh = new THREE.Mesh(
-    trackGeo(new THREE.BoxGeometry(1.52, 0.28, 0.24)),
-    trackMat(new THREE.MeshStandardMaterial({ color: 0xdb2777, roughness: 0.45 }))
-  );
-  parallelMesh.position.set(1.85, 0.68, -0.34);
-  [1.0, 2.7].forEach((hx) => {
-    const hexNut = new THREE.Mesh(trackGeo(new THREE.CylinderGeometry(0.05, 0.05, 0.16, 6)), steelMat);
-    hexNut.rotation.x = Math.PI / 2;
-    hexNut.position.set(hx, 0.68, -0.38);
-    backPanelGroup.add(hexNut);
+  // 13. #15–#24 MACRO-AUTHENTIC BACK PANEL I/O SHIELD (Steel EMI Cans, 6-hole PS/2, 25-hole DB25, 9-pin DB9, 8-pin RJ45, USB, Audio)
+  const bpParts = buildMacroBackPanelParts(tracker, {
+    pcbY: 0.16,
+    brushedSteelMat: steelMat,
+    darkAnodizedMat,
+    hardBlackPlastic: mattePlasticBlack,
+    hardSlateBluePlastic: slotBlueMat,
+    cavityMat,
+    goldMat,
+    brassMat,
   });
-
-  const serialMesh = new THREE.Mesh(
-    trackGeo(new THREE.BoxGeometry(0.76, 0.24, 0.24)),
-    trackMat(new THREE.MeshStandardMaterial({ color: 0x0d9488, roughness: 0.45 }))
-  );
-  serialMesh.position.set(2.15, 0.28, -0.34);
-
-  const spdifMesh = new THREE.Mesh(
-    trackGeo(new THREE.CylinderGeometry(0.14, 0.14, 0.26, 16)),
-    trackMat(new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.35, metalness: 0.5 }))
-  );
-  spdifMesh.rotation.x = Math.PI / 2;
-  spdifMesh.position.set(0.65, 0.32, -0.34);
-
-  const firewireMesh = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.46, 0.28, 0.24)), mattePlasticBlack);
-  firewireMesh.position.set(-0.35, 0.62, -0.34);
-
-  const rj45Mesh = new THREE.Mesh(
-    trackGeo(new THREE.BoxGeometry(0.58, 0.42, 0.26)),
-    trackMat(new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.38, metalness: 0.6 }))
-  );
-  rj45Mesh.position.set(-1.45, 0.72, -0.34);
-  const lanLedG = new THREE.Mesh(
-    trackGeo(new THREE.BoxGeometry(0.08, 0.06, 0.04)),
-    trackMat(new THREE.MeshStandardMaterial({ color: 0x10b981, emissive: 0x10b981, emissiveIntensity: 0.7 }))
-  );
-  lanLedG.position.set(-1.62, 0.86, -0.47);
-  const lanLedA = new THREE.Mesh(
-    trackGeo(new THREE.BoxGeometry(0.08, 0.06, 0.04)),
-    trackMat(new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.6 }))
-  );
-  lanLedA.position.set(-1.28, 0.86, -0.47);
-
-  const usbStack = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.58, 0.36, 0.24)), mattePlasticBlack);
-  usbStack.position.set(-1.45, 0.26, -0.34);
-
-  const audioColors = [0x3b82f6, 0x22c55e, 0xec4899, 0x111827, 0xf97316, 0x9ca3af];
-  audioColors.forEach((col, i) => {
-    const colIdx = i % 3;
-    const rowIdx = Math.floor(i / 3);
-    const jack = new THREE.Mesh(
-      trackGeo(new THREE.CylinderGeometry(0.105, 0.105, 0.22, 14)),
-      trackMat(new THREE.MeshStandardMaterial({ color: col, roughness: 0.42 }))
-    );
-    jack.rotation.x = Math.PI / 2;
-    jack.position.set(-2.45 - colIdx * 0.28, 0.64 - rowIdx * 0.32, -0.34);
-    backPanelGroup.add(jack);
-  });
-
-  backPanelGroup.add(
-    ps2Mouse,
-    ps2Kb,
-    parallelMesh,
-    serialMesh,
-    spdifMesh,
-    firewireMesh,
-    rj45Mesh,
-    lanLedG,
-    lanLedA,
-    usbStack
+  boardGroup.add(
+    bpParts.backPanelAnchor,
+    bpParts.ps2Mouse,
+    bpParts.ps2Keyboard,
+    bpParts.parallelPort,
+    bpParts.serialPort,
+    bpParts.spdifPort,
+    bpParts.firewirePort,
+    bpParts.rj45Port,
+    bpParts.usbPorts,
+    bpParts.audioPorts
   );
 
   // 14. GROOVED ELECTROLYTIC CAPACITORS + VRM FERRITE CHOKES + SMD ICs

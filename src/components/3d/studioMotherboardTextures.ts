@@ -2,19 +2,20 @@ import * as THREE from 'three';
 
 export interface StudioPcbTextureSet {
   map: THREE.CanvasTexture;
-  bumpMap: THREE.CanvasTexture;
+  bumpMap: THREE.CanvasTexture | null;
   roughnessMap: THREE.CanvasTexture;
   dispose: () => void;
 }
 
 /**
- * Generates ultra-detailed matte-black PCB albedo, bump, and roughness maps
+ * Generates ultra-detailed matte-black PCB albedo, optional bump, and roughness maps
  * with shimmering copper/gold bus traces, micro-vias, and brass mounting rings.
  * Strictly zero giant game-style silkscreen labels.
  */
 export function createStudioPcbTextures(
   maxAniso: number,
-  textureScale = 1
+  textureScale = 1,
+  includeBumpMap = textureScale > 0.5
 ): StudioPcbTextureSet {
   const size = Math.max(512, Math.round(1024 * textureScale));
 
@@ -23,23 +24,29 @@ export function createStudioPcbTextures(
   albedoCanvas.height = size;
   const aCtx = albedoCanvas.getContext('2d');
 
-  const bumpCanvas = document.createElement('canvas');
-  bumpCanvas.width = size;
-  bumpCanvas.height = size;
-  const bCtx = bumpCanvas.getContext('2d');
+  let bumpCanvas: HTMLCanvasElement | null = null;
+  let bCtx: CanvasRenderingContext2D | null = null;
+  if (includeBumpMap) {
+    bumpCanvas = document.createElement('canvas');
+    bumpCanvas.width = size;
+    bumpCanvas.height = size;
+    bCtx = bumpCanvas.getContext('2d');
+  }
 
   const roughCanvas = document.createElement('canvas');
   roughCanvas.width = size;
   roughCanvas.height = size;
   const rCtx = roughCanvas.getContext('2d');
 
-  if (aCtx && bCtx && rCtx) {
+  if (aCtx && rCtx) {
     // 1. Deep matte-black solder mask base
     aCtx.fillStyle = '#0E1218';
     aCtx.fillRect(0, 0, size, size);
 
-    bCtx.fillStyle = '#505050';
-    bCtx.fillRect(0, 0, size, size);
+    if (bCtx) {
+      bCtx.fillStyle = '#505050';
+      bCtx.fillRect(0, 0, size, size);
+    }
 
     // Matte fiberglass roughness (~0.68 = #ADADAD)
     rCtx.fillStyle = '#ADADAD';
@@ -95,7 +102,7 @@ export function createStudioPcbTextures(
           ctx.stroke();
         };
         drawPath(aCtx, color, widthPx);
-        drawPath(bCtx, '#C8C8C8', widthPx + 0.6);
+        if (bCtx) drawPath(bCtx, '#C8C8C8', widthPx + 0.6);
         // Glossy metallic traces have lower roughness (#363636)
         drawPath(rCtx, '#3A3A3A', widthPx + 0.5);
       }
@@ -262,10 +269,12 @@ export function createStudioPcbTextures(
       aCtx.arc(vx, vy, viaR * 0.48, 0, Math.PI * 2);
       aCtx.fill();
 
-      bCtx.fillStyle = '#E0E0E0';
-      bCtx.beginPath();
-      bCtx.arc(vx, vy, viaR, 0, Math.PI * 2);
-      bCtx.fill();
+      if (bCtx) {
+        bCtx.fillStyle = '#E0E0E0';
+        bCtx.beginPath();
+        bCtx.arc(vx, vy, viaR, 0, Math.PI * 2);
+        bCtx.fill();
+      }
 
       rCtx.fillStyle = '#282828';
       rCtx.beginPath();
@@ -314,14 +323,16 @@ export function createStudioPcbTextures(
       aCtx.arc(cx, cy, padInner, 0, Math.PI * 2);
       aCtx.fill();
 
-      bCtx.fillStyle = '#FFFFFF';
-      bCtx.beginPath();
-      bCtx.arc(cx, cy, padOuter, 0, Math.PI * 2);
-      bCtx.fill();
-      bCtx.fillStyle = '#080808';
-      bCtx.beginPath();
-      bCtx.arc(cx, cy, padInner, 0, Math.PI * 2);
-      bCtx.fill();
+      if (bCtx) {
+        bCtx.fillStyle = '#FFFFFF';
+        bCtx.beginPath();
+        bCtx.arc(cx, cy, padOuter, 0, Math.PI * 2);
+        bCtx.fill();
+        bCtx.fillStyle = '#080808';
+        bCtx.beginPath();
+        bCtx.arc(cx, cy, padInner, 0, Math.PI * 2);
+        bCtx.fill();
+      }
 
       rCtx.fillStyle = '#242424';
       rCtx.beginPath();
@@ -339,8 +350,11 @@ export function createStudioPcbTextures(
   map.colorSpace = THREE.SRGBColorSpace;
   map.anisotropy = maxAniso;
 
-  const bumpMap = new THREE.CanvasTexture(bumpCanvas);
-  bumpMap.anisotropy = maxAniso;
+  let bumpMap: THREE.CanvasTexture | null = null;
+  if (bumpCanvas) {
+    bumpMap = new THREE.CanvasTexture(bumpCanvas);
+    bumpMap.anisotropy = maxAniso;
+  }
 
   const roughnessMap = new THREE.CanvasTexture(roughCanvas);
   roughnessMap.anisotropy = maxAniso;
@@ -351,7 +365,7 @@ export function createStudioPcbTextures(
     roughnessMap,
     dispose: () => {
       map.dispose();
-      bumpMap.dispose();
+      bumpMap?.dispose();
       roughnessMap.dispose();
     },
   };
@@ -365,7 +379,7 @@ export function createStudioFloorTexture(
   maxAniso: number,
   textureScale = 1
 ): THREE.CanvasTexture {
-  const size = Math.max(512, Math.round(768 * textureScale));
+  const size = textureScale <= 0.5 ? 256 : Math.max(512, Math.round(768 * textureScale));
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -431,8 +445,12 @@ export function createBrushedMetalTexture(maxAniso: number): THREE.CanvasTexture
 /**
  * Generates ultra-crisp reflective LGA 775 gold contact pin bed with central SMD cavity.
  */
-export function createMacroLga775GoldTexture(maxAniso: number): THREE.CanvasTexture {
-  const size = 512;
+export function createMacroLga775GoldTexture(
+  maxAniso: number,
+  textureScale = 1
+): THREE.CanvasTexture {
+  const size = textureScale <= 0.5 ? 256 : 512;
+  const s = size / 512;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -443,7 +461,7 @@ export function createMacroLga775GoldTexture(maxAniso: number): THREE.CanvasText
     ctx.fillRect(0, 0, size, size);
 
     const grid = 28;
-    const pad = 26;
+    const pad = 26 * s;
     const step = (size - pad * 2) / grid;
 
     for (let gx = 0; gx < grid; gx++) {
@@ -458,9 +476,9 @@ export function createMacroLga775GoldTexture(maxAniso: number): THREE.CanvasText
 
         // Angled micro-pin metallic highlight
         ctx.fillStyle = '#EAB308';
-        ctx.fillRect(px + 2, py + 2, step * 0.56, step * 0.56);
+        ctx.fillRect(px + 2 * s, py + 2 * s, step * 0.56, step * 0.56);
         ctx.fillStyle = '#FEF08A';
-        ctx.fillRect(px + 2, py + 2, step * 0.28, step * 0.28);
+        ctx.fillRect(px + 2 * s, py + 2 * s, step * 0.28, step * 0.28);
       }
     }
 
@@ -471,26 +489,26 @@ export function createMacroLga775GoldTexture(maxAniso: number): THREE.CanvasText
     ctx.fillStyle = '#0D1E17';
     ctx.fillRect(cx0, cy0, cw, cw);
     ctx.strokeStyle = '#3F341A';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = Math.max(1.5, 3 * s);
     ctx.strokeRect(cx0, cy0, cw, cw);
 
     for (let i = 0; i < 4; i++) {
       for (let j = 0; j < 3; j++) {
-        const sx = cx0 + 14 + i * (cw / 4.4);
-        const sy = cy0 + 18 + j * (cw / 3.4);
+        const sx = cx0 + 14 * s + i * (cw / 4.4);
+        const sy = cy0 + 18 * s + j * (cw / 3.4);
         ctx.fillStyle = '#D1D5DB';
-        ctx.fillRect(sx, sy, 14, 7);
+        ctx.fillRect(sx, sy, 14 * s, 7 * s);
         ctx.fillStyle = '#92400E';
-        ctx.fillRect(sx + 3, sy, 8, 7);
+        ctx.fillRect(sx + 3 * s, sy, 8 * s, 7 * s);
       }
     }
 
     // Golden corner orientation triangle
     ctx.fillStyle = '#FACC15';
     ctx.beginPath();
-    ctx.moveTo(16, size - 16);
-    ctx.lineTo(54, size - 16);
-    ctx.lineTo(16, size - 54);
+    ctx.moveTo(16 * s, size - 16 * s);
+    ctx.lineTo(54 * s, size - 16 * s);
+    ctx.lineTo(16 * s, size - 54 * s);
     ctx.closePath();
     ctx.fill();
   }

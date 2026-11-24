@@ -7,6 +7,9 @@ export interface ResolvedRenderProfile {
   isMobileViewport: boolean;
   maxDpr: number;
   antialias: boolean;
+  precision: 'mediump' | 'highp';
+  targetFps: 30 | 60;
+  enableBumpMaps: boolean;
   shadowsEnabled: boolean;
   shadowMapSize: 512 | 1024 | 2048;
   anisotropyCap: number;
@@ -141,6 +144,9 @@ export function resolveRenderProfile(
       isMobileViewport,
       maxDpr: 1,
       antialias: false,
+      precision: 'mediump',
+      targetFps: 30,
+      enableBumpMaps: false,
       shadowsEnabled: false,
       shadowMapSize: 512,
       anisotropyCap: 2,
@@ -158,12 +164,15 @@ export function resolveRenderProfile(
       mode,
       effectiveTier,
       isMobileViewport,
-      maxDpr: isMobileViewport ? 1.15 : 1.25,
+      maxDpr: isMobileViewport ? 1 : 1.2,
       antialias: false,
+      precision: 'mediump',
+      targetFps: isMobileViewport ? 30 : 60,
+      enableBumpMaps: false,
       shadowsEnabled: false,
       shadowMapSize: 512,
       anisotropyCap: 2,
-      pinSyncIntervalMs: 55,
+      pinSyncIntervalMs: 60,
       textureScale: 0.5,
       label: mode === 'auto' ? 'Auto · Hemat' : 'Hemat',
     };
@@ -176,6 +185,9 @@ export function resolveRenderProfile(
       isMobileViewport,
       maxDpr: 1.4,
       antialias: true,
+      precision: 'highp',
+      targetFps: 60,
+      enableBumpMaps: true,
       shadowsEnabled: true,
       shadowMapSize: 512,
       anisotropyCap: 4,
@@ -191,6 +203,9 @@ export function resolveRenderProfile(
     isMobileViewport,
     maxDpr: isMobileViewport ? 1.65 : 2,
     antialias: true,
+    precision: 'highp',
+    targetFps: 60,
+    enableBumpMaps: true,
     shadowsEnabled: true,
     shadowMapSize: isMobileViewport ? 1024 : 2048,
     anisotropyCap: 8,

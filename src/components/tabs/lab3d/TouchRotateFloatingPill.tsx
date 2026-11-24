@@ -73,6 +73,39 @@ export function getRotateToolMeta(
       gestureHint: 'Pastikan kutub (+) benar',
     };
   }
+  if (activeHeldId === 'install-atx-24pin') {
+    const aligned = rotationStep % 2 === 0;
+    return {
+      show: true,
+      aligned,
+      actionLabel: 'Balik Klip ATX',
+      alignedLabel: 'Klip ATX 24P OK',
+      angleBadge: aligned ? 'Klip' : 'Terbalik',
+      gestureHint: 'Sejajarkan klip pengunci ke kait soket',
+    };
+  }
+  if (activeHeldId === 'install-atx-4pin') {
+    const aligned = rotationStep % 2 === 0;
+    return {
+      show: true,
+      aligned,
+      actionLabel: 'Balik Klip 4-Pin',
+      alignedLabel: 'Klip 4-Pin OK',
+      angleBadge: aligned ? 'Klip' : 'Terbalik',
+      gestureHint: 'Sejajarkan klip pengunci ATX 12V',
+    };
+  }
+  if (activeHeldId === 'install-hdd-molex') {
+    const aligned = rotationStep % 2 === 0;
+    return {
+      show: true,
+      aligned,
+      actionLabel: 'Balik Bevel Molex',
+      alignedLabel: 'Bevel D-Shape OK',
+      angleBadge: aligned ? 'Atas' : 'Terbalik',
+      gestureHint: 'Sisi miring D-Shape menghadap atas',
+    };
+  }
   return {
     show: false,
     aligned: true,

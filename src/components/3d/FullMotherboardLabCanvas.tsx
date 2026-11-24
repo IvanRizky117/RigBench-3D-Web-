@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { MAINBOARD_COMPONENTS } from '../../data/mainboardData';
-import { FPANEL_ALL_ZONES, FPANEL_CORRECT_ZONE_BY_WIRE } from '../../data/assemblyGameData';
+import { FPANEL_ALL_ZONES } from '../../data/assemblyGameData';
 import type {
   AssemblyStepId,
   CPanelWireId,
@@ -30,6 +30,13 @@ import {
 export interface DragValidationCheck {
   state: DragTintState;
   reason?: string;
+}
+
+export interface RejectBounceEvent {
+  nonce: number;
+  itemId: AssemblyStepId;
+  socketId: string;
+  rotationStep: number;
 }
 
 export type AssembleAutoFocusTarget =
@@ -67,6 +74,7 @@ interface FullMotherboardLabCanvasProps {
   dragInitialClientPos: { x: number; y: number; pointerId?: number } | null;
   dragRotationStep: number;
   isHeldPartAligned: boolean;
+  rejectEvent?: RejectBounceEvent | null;
   dockHeightPx?: number;
   canRotateActive?: boolean;
   onRotateActivePart?: () => void;
@@ -108,6 +116,7 @@ interface AdaptiveRingProfile {
 
 const DEFAULT_CAM_POS = new THREE.Vector3(7.4, 9.2, 11.4);
 const DEFAULT_CAM_TARGET = new THREE.Vector3(0.45, 0.25, 0.55);
+const _rejectWorldPos = new THREE.Vector3();
 
 const BROAD_SOCKET_SNAP_COORDS: Record<string, [number, number, number]> = {
   'cpu-socket': [2.1, 0.42, -1.6],
@@ -208,6 +217,7 @@ export function FullMotherboardLabCanvas({
   dragInitialClientPos,
   dragRotationStep,
   isHeldPartAligned,
+  rejectEvent = null,
   dockHeightPx = 190,
   canRotateActive = false,
   onRotateActivePart,
@@ -238,6 +248,8 @@ export function FullMotherboardLabCanvas({
   });
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [glbLoading, setGlbLoading] = useState(false);
+  const [webglFailed, setWebglFailed] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   const builtRef = useRef<BuiltMotherboardScene | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -247,6 +259,7 @@ export function FullMotherboardLabCanvas({
   const controlsRef = useRef<OrbitControls | null>(null);
   const glbHandleRef = useRef<LoadedGlbHandle | null>(null);
   const dragPreviewRef = useRef<ReturnType<typeof createDragPreviewSystem> | null>(null);
+  const hitboxByIdRef = useRef<Map<string, THREE.Mesh>>(new Map());
   const pinBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const isSoftwareGlRef = useRef<boolean>(false);
   const renderProfileRef = useRef<ResolvedRenderProfile | null>(null);
@@ -336,17 +349,39 @@ export function FullMotherboardLabCanvas({
       }
       if (next.has('install-ram-1') && !prev.has('install-ram-1')) {
         built.assemblyParts.ramStick1.rotation.y = 0.35;
-        built.assemblyParts.ramStick1.position.y = 1.35;
+        built.assemblyParts.ramStick1.position.y = 1.15;
         lockFlashRef.current.ram1 = 1.25;
       }
       if (next.has('install-ram-2') && !prev.has('install-ram-2')) {
         built.assemblyParts.ramStick2.rotation.y = -0.35;
-        built.assemblyParts.ramStick2.position.y = 1.35;
+        built.assemblyParts.ramStick2.position.y = 1.15;
         lockFlashRef.current.ram2 = 1.25;
       }
     }
     prevStepsRef.current = next;
   }, [completedAssemblySteps]);
+
+  // Trigger physical 3D collision bounce (mentok -> crimson micro-shake -> spring back) when placement is rejected
+  useEffect(() => {
+    if (!rejectEvent) return;
+    const dragPreview = dragPreviewRef.current;
+    if (!dragPreview) return;
+    const hb = hitboxByIdRef.current.get(rejectEvent.socketId);
+    if (hb) {
+      hb.getWorldPosition(_rejectWorldPos);
+      _rejectWorldPos.y += 0.12;
+    } else if (BROAD_SOCKET_SNAP_COORDS[rejectEvent.socketId]) {
+      const [sx, sy, sz] = BROAD_SOCKET_SNAP_COORDS[rejectEvent.socketId];
+      _rejectWorldPos.set(sx, sy + 0.12, sz);
+    } else {
+      return;
+    }
+    dragPreview.triggerRejectBounce(
+      rejectEvent.itemId,
+      _rejectWorldPos,
+      rejectEvent.rotationStep
+    );
+  }, [rejectEvent]);
 
   // Mount Three.js WebGLRenderer ONCE
   useEffect(() => {
@@ -358,10 +393,17 @@ export function FullMotherboardLabCanvas({
     const initialProfile = resolveRenderProfile(graphicsQualityRef.current, isSoftwareGl);
     renderProfileRef.current = initialProfile;
 
-    const renderer = new THREE.WebGLRenderer({
-      antialias: initialProfile.antialias,
-      powerPreference: initialProfile.effectiveTier === 'low' ? 'default' : 'high-performance',
-    });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: initialProfile.antialias,
+        precision: initialProfile.precision,
+        powerPreference: initialProfile.effectiveTier === 'low' ? 'default' : 'high-performance',
+      });
+    } catch {
+      setWebglFailed(true);
+      return;
+    }
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.16;
@@ -469,6 +511,7 @@ export function FullMotherboardLabCanvas({
       const cid = hb.userData.componentId as string | undefined;
       if (cid) hitboxById.set(cid, hb);
     });
+    hitboxByIdRef.current = hitboxById;
 
     const pickBestHit = (hits: THREE.Intersection[], preferSpecificAssemble: boolean): string | null => {
       if (hits.length === 0) return null;
@@ -557,7 +600,9 @@ export function FullMotherboardLabCanvas({
     let frameId = 0;
     let disposed = false;
     let isTabHidden = document.hidden;
+    let isContextLost = false;
     let lastPinSync = 0;
+    let lastRenderAt = 0;
     let lastCamSignature = '';
     let lastReportedSnapKey = '';
 
@@ -570,7 +615,7 @@ export function FullMotherboardLabCanvas({
       const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
       gl.flush();
       const poll = () => {
-        if (disposed || isTabHidden) {
+        if (disposed || isTabHidden || isContextLost) {
           if (sync) gl.deleteSync(sync);
           return;
         }
@@ -586,7 +631,16 @@ export function FullMotherboardLabCanvas({
     };
 
     const tick = () => {
-      if (disposed || isTabHidden) return;
+      if (disposed || isTabHidden || isContextLost) return;
+      const targetFps = renderProfileRef.current?.targetFps ?? 60;
+      if (!isSoftwareGl && targetFps < 60) {
+        const frameNow = performance.now();
+        if (lastRenderAt > 0 && frameNow - lastRenderAt < 1000 / targetFps - 1.5) {
+          frameId = window.requestAnimationFrame(tick);
+          return;
+        }
+        lastRenderAt = frameNow;
+      }
       timer.update();
       const delta = Math.min(timer.getDelta(), 0.05);
       const elapsed = timer.getElapsed();
@@ -670,6 +724,10 @@ export function FullMotherboardLabCanvas({
         }
 
         const check = evaluateDragRef.current(activeDragId, snappedSocket, dragRotationRef.current);
+        if (snappedSocket && check.state === 'invalid') {
+          // Physically lift blocked component above the notch divider / key rim until aligned
+          dragTargetVec.y += 0.16;
+        }
         dragPreview.setTint(check.state);
         dragPreview.setTransform(
           dragTargetVec,
@@ -688,7 +746,9 @@ export function FullMotherboardLabCanvas({
           });
         }
       } else {
-        dragPreview.setActiveItem(null);
+        if (!dragPreview.updateReject(delta)) {
+          dragPreview.setActiveItem(null);
+        }
         dragSnapSocketRef.current = null;
         if (lastReportedSnapKey !== '') {
           lastReportedSnapKey = '';
@@ -716,9 +776,16 @@ export function FullMotherboardLabCanvas({
         delta
       );
 
-      const showCpu = !isAssemble || done.has('install-cpu');
+      // Semi-open Inspect Showcase (!isAssemble): LGA 775 socket OPEN (gold pins + lugs visible),
+      // 1 notched RAM seated in DIMM 1 (DIMM 2-4 open), CMOS CR2032 seated, all other slots & headers OPEN.
+      const showCpu = isAssemble && done.has('install-cpu');
       parts.cpuChip.visible = showCpu;
-      parts.cpuChip.position.y = THREE.MathUtils.damp(parts.cpuChip.position.y, showCpu ? 0 : 1.05, 9, delta);
+      parts.cpuChip.position.y = THREE.MathUtils.damp(
+        parts.cpuChip.position.y,
+        showCpu ? 0.055 : 1.05,
+        9,
+        delta
+      );
       parts.cpuChip.rotation.y = THREE.MathUtils.damp(parts.cpuChip.rotation.y, 0, 10, delta);
 
       const showPaste = isAssemble && done.has('apply-thermal-paste') && !done.has('install-heatsink');
@@ -727,11 +794,11 @@ export function FullMotherboardLabCanvas({
         THREE.MathUtils.damp(parts.thermalPaste.scale.x, showPaste ? 1 : 0.01, 10, delta)
       );
 
-      const showHeatsink = !isAssemble || done.has('install-heatsink');
+      const showHeatsink = isAssemble && done.has('install-heatsink');
       parts.cpuHeatsink.visible = showHeatsink;
       parts.cpuHeatsink.position.y = THREE.MathUtils.damp(
         parts.cpuHeatsink.position.y,
-        showHeatsink ? 0.29 : 1.9,
+        showHeatsink ? 0.23 : 1.9,
         8,
         delta
       );
@@ -760,12 +827,12 @@ export function FullMotherboardLabCanvas({
         }
       });
 
-      // Single-Stick RAM 1 (DIMM 1) + Independent White Clips
+      // Single-Stick Notched RAM 1 (DIMM 1) + Independent Pivoting White Clips (seated in Inspect!)
       const showRam1 = !isAssemble || done.has('install-ram-1');
       parts.ramStick1.visible = showRam1;
       parts.ramStick1.position.y = THREE.MathUtils.damp(
         parts.ramStick1.position.y,
-        showRam1 ? 0.44 : 1.45,
+        showRam1 ? 0.035 : 1.35,
         9,
         delta
       );
@@ -774,12 +841,12 @@ export function FullMotherboardLabCanvas({
       parts.ramClips1Left.rotation.z = THREE.MathUtils.damp(parts.ramClips1Left.rotation.z, clip1Angle, 10, delta);
       parts.ramClips1Right.rotation.z = THREE.MathUtils.damp(parts.ramClips1Right.rotation.z, -clip1Angle, 10, delta);
 
-      // Single-Stick RAM 2 (DIMM 2) + Independent White Clips
-      const showRam2 = !isAssemble || done.has('install-ram-2');
+      // Single-Stick Notched RAM 2 (DIMM 2) + Independent Pivoting White Clips (open in Inspect!)
+      const showRam2 = isAssemble && done.has('install-ram-2');
       parts.ramStick2.visible = showRam2;
       parts.ramStick2.position.y = THREE.MathUtils.damp(
         parts.ramStick2.position.y,
-        showRam2 ? 0.44 : 1.45,
+        showRam2 ? 0.035 : 1.35,
         9,
         delta
       );
@@ -813,19 +880,34 @@ export function FullMotherboardLabCanvas({
 
       const showCmos = !isAssemble || done.has('install-cmos');
       parts.cmosCoin.visible = showCmos;
-      parts.cmosCoin.position.y = THREE.MathUtils.damp(parts.cmosCoin.position.y, showCmos ? 0.135 : 0.75, 9, delta);
+      parts.cmosCoin.position.y = THREE.MathUtils.damp(
+        parts.cmosCoin.position.y,
+        showCmos ? 0.095 : 0.75,
+        9,
+        delta
+      );
 
-      const showVga = !isAssemble || done.has('install-vga');
+      const showVga = isAssemble && done.has('install-vga');
       parts.vgaCard.visible = showVga;
-      parts.vgaCard.position.y = THREE.MathUtils.damp(parts.vgaCard.position.y, showVga ? 0.42 : 1.85, 8, delta);
-      parts.pcie16Latch.rotation.x = THREE.MathUtils.damp(parts.pcie16Latch.rotation.x, showVga ? 0 : 0.46, 10, delta);
+      parts.vgaCard.position.y = THREE.MathUtils.damp(
+        parts.vgaCard.position.y,
+        showVga ? 0.2 : 1.65,
+        8,
+        delta
+      );
+      parts.pcie16Latch.rotation.z = THREE.MathUtils.damp(
+        parts.pcie16Latch.rotation.z,
+        showVga ? 0 : 0.46,
+        10,
+        delta
+      );
 
       // Clickable VGA Bracket Thumbscrew (descends & spins down when tightened!)
       const screwTight = !isAssemble || vgaScrewRef.current;
       parts.vgaBracketScrew.visible = showVga;
       parts.vgaBracketScrew.position.y = THREE.MathUtils.damp(
         parts.vgaBracketScrew.position.y,
-        screwTight ? 1.01 : 1.22,
+        screwTight ? 1.23 : 1.44,
         11,
         delta
       );
@@ -861,18 +943,18 @@ export function FullMotherboardLabCanvas({
       parts.hddRearPortMats.molex.emissiveIntensity =
         isAssemble && guideId === 'hdd-molex-port' ? pulseGlow * 1.3 : 0;
 
-      // 2-End IDE Data Cable Visibility (Partial = Board #12 only; Complete = Board #12 <-> HDD Rear IDE)
+      // 2-End IDE Data Cable Visibility (open in Inspect so 40-pin hollow header is clearly visible!)
       const ideState = ideEndsRef.current;
-      const ideComplete = !isAssemble || (ideState.board && ideState.hdd);
+      const ideComplete = isAssemble && ideState.board && ideState.hdd;
       const idePartial = isAssemble && ideState.board && !ideState.hdd;
       parts.ideRibbonCable.visible = ideComplete;
       parts.ideRibbonPartial.visible = idePartial;
 
-      parts.hddMolexCable.visible = !isAssemble || done.has('install-hdd-molex');
+      parts.hddMolexCable.visible = isAssemble && done.has('install-hdd-molex');
 
-      // Split ATX 24-Pin Mainboard + ATX 4-Pin CPU 12V Power Bundles
-      parts.atx24CableBundle.visible = !isAssemble || done.has('install-atx-24pin');
-      parts.atx4CableBundle.visible = !isAssemble || done.has('install-atx-4pin');
+      // Split ATX 24-Pin Mainboard + ATX 4-Pin CPU 12V Power Bundles (open in Inspect so 24/4 hollow cells show!)
+      parts.atx24CableBundle.visible = isAssemble && done.has('install-atx-24pin');
+      parts.atx4CableBundle.visible = isAssemble && done.has('install-atx-4pin');
       parts.atx4PinGlowMat.emissiveIntensity =
         isAssemble && guideId === 'atx-4pin' ? pulseGlow * 1.25 : 0;
 
@@ -888,10 +970,10 @@ export function FullMotherboardLabCanvas({
         const connectedGroup = parts.cpanelWiresById[wireKey];
         const looseGroup = parts.cpanelLooseWiresById[wireKey];
         if (!isAssemble) {
-          parts.routeCPanelWireToZone(wireKey, FPANEL_CORRECT_ZONE_BY_WIRE[wireKey]);
-          connectedGroup.visible = true;
-          connectedGroup.position.y = 0;
-          looseGroup.visible = false;
+          // Semi-open Inspect: keep F_PANEL 9-pin color header uncovered & readable while wires rest neatly beside tray
+          connectedGroup.visible = false;
+          connectedGroup.position.y = 0.48;
+          looseGroup.visible = true;
         } else {
           const assignment = wiringMap[wireKey];
           if (assignment) {
@@ -1091,8 +1173,9 @@ export function FullMotherboardLabCanvas({
         window.cancelAnimationFrame(frameId);
         window.clearTimeout(frameId);
         frameId = 0;
-      } else {
+      } else if (!isContextLost) {
         timer.reset();
+        lastRenderAt = 0;
         forcePinSyncRef.current = true;
         if (!frameId) {
           tick();
@@ -1100,6 +1183,28 @@ export function FullMotherboardLabCanvas({
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    const onContextLost = (e: Event) => {
+      e.preventDefault();
+      isContextLost = true;
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(frameId);
+      frameId = 0;
+      setWebglFailed(true);
+    };
+    const onContextRestored = () => {
+      if (disposed) return;
+      isContextLost = false;
+      setWebglFailed(false);
+      timer.reset();
+      lastRenderAt = 0;
+      forcePinSyncRef.current = true;
+      if (!isTabHidden && !frameId) {
+        tick();
+      }
+    };
+    renderer.domElement.addEventListener('webglcontextlost', onContextLost);
+    renderer.domElement.addEventListener('webglcontextrestored', onContextRestored);
 
     const resizeObserver = new ResizeObserver(() => {
       const w = host.clientWidth;
@@ -1128,6 +1233,8 @@ export function FullMotherboardLabCanvas({
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
+      renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
+      renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);
 
       if (glbHandleRef.current) {
         scene.remove(glbHandleRef.current.model);
@@ -1145,7 +1252,7 @@ export function FullMotherboardLabCanvas({
         host.removeChild(renderer.domElement);
       }
     };
-  }, [reducedMotion]);
+  }, [reducedMotion, retryNonce]);
 
   // Live Graphics Quality Toggle without recreating WebGL context or resetting assembly state
   useEffect(() => {
@@ -1419,6 +1526,29 @@ export function FullMotherboardLabCanvas({
       }`}
     >
       <div ref={hostRef} className="h-full w-full" />
+
+      {webglFailed && (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-[#0B0E14]/96 px-6 text-center">
+          <div className="max-w-sm rounded-xl border border-[#38BDF8]/30 bg-[#111827] p-5 shadow-2xl">
+            <p className="text-sm font-semibold text-[#F8FAFC]">
+              Memori GPU Perangkat Sedang Penuh
+            </p>
+            <p className="mt-1.5 text-xs leading-relaxed text-[#94A3B8]">
+              Konteks WebGL terputus oleh sistem perangkat. Progres rakit tetap aman — tekan tombol di bawah untuk memuat ulang kanvas 3D.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setWebglFailed(false);
+                setRetryNonce((n) => n + 1);
+              }}
+              className="mt-4 inline-flex min-h-[40px] items-center justify-center rounded-lg bg-[#06B6D4] px-4 py-2 text-xs font-semibold text-[#0B0E14] transition-colors hover:bg-[#22D3EE]"
+            >
+              Muat Ulang Kanvas 3D
+            </button>
+          </div>
+        </div>
+      )}
 
       {glbLoading && (
         <div className="pointer-events-none absolute top-16 left-1/2 -translate-x-1/2 rounded-lg bg-[#141923] px-4 py-2 text-xs font-medium text-[#06B6D4] border border-[#06B6D4]/30">

@@ -33,6 +33,7 @@ export function MiniMotherboardCanvas({
     try {
       renderer = new THREE.WebGLRenderer({
         antialias: profile.antialias,
+        precision: profile.precision,
         alpha: true,
         powerPreference: profile.effectiveTier === 'low' ? 'default' : 'high-performance',
       });
@@ -138,8 +139,18 @@ export function MiniMotherboardCanvas({
       frameId = window.setTimeout(poll, 8);
     };
 
+    let lastRenderAt = 0;
+
     const tick = () => {
       if (disposed || !inView || !docVisible) return;
+      if (!isSoftwareGl && profile.targetFps < 60) {
+        const frameNow = performance.now();
+        if (lastRenderAt > 0 && frameNow - lastRenderAt < 1000 / profile.targetFps - 1.5) {
+          frameId = window.requestAnimationFrame(tick);
+          return;
+        }
+        lastRenderAt = frameNow;
+      }
       timer.update();
       const elapsed = timer.getElapsed();
       if (!reducedMotion) {
@@ -166,6 +177,7 @@ export function MiniMotherboardCanvas({
     const resumeIfActive = () => {
       if (!disposed && inView && docVisible && !frameId) {
         timer.reset();
+        lastRenderAt = 0;
         tick();
       }
     };

@@ -51,6 +51,7 @@ import {
   FullMotherboardLabCanvas,
   type AssembleAutoFocusTarget,
   type DragValidationCheck,
+  type RejectBounceEvent,
 } from '../3d/FullMotherboardLabCanvas';
 import type { DragTintState } from '../3d/dragPreviewFactory';
 import { OptionalGlbErrorBoundary } from '../3d/OptionalGlbLoader';
@@ -108,6 +109,9 @@ function needsPartRotation(itemId: AssemblyStepId | null): boolean {
     itemId === 'install-ram-1' ||
     itemId === 'install-ram-2' ||
     itemId === 'install-ide-cable' ||
+    itemId === 'install-hdd-molex' ||
+    itemId === 'install-atx-24pin' ||
+    itemId === 'install-atx-4pin' ||
     itemId === 'wire-hdd-led' ||
     itemId === 'wire-pled-pos' ||
     itemId === 'wire-pled-neg'
@@ -130,6 +134,9 @@ function isPartOrientationValid(itemId: AssemblyStepId, rotationStep: number): b
   }
   if (
     itemId === 'install-ide-cable' ||
+    itemId === 'install-hdd-molex' ||
+    itemId === 'install-atx-24pin' ||
+    itemId === 'install-atx-4pin' ||
     itemId === 'wire-hdd-led' ||
     itemId === 'wire-pled-pos' ||
     itemId === 'wire-pled-neg'
@@ -294,6 +301,21 @@ export function Lab3DTab({
   const [mistakes, setMistakes] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [activeReport, setActiveReport] = useState<AssemblyReport | null>(null);
+  const [rejectEvent, setRejectEvent] = useState<RejectBounceEvent | null>(null);
+
+  const rejectNonceRef = useRef(0);
+  const triggerReject = useCallback(
+    (itemId: AssemblyStepId, socketId: string, rot: number) => {
+      rejectNonceRef.current += 1;
+      setRejectEvent({
+        nonce: rejectNonceRef.current,
+        itemId,
+        socketId,
+        rotationStep: rot,
+      });
+    },
+    []
+  );
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -627,6 +649,7 @@ export function Lab3DTab({
       setMistakes(0);
       setElapsedSeconds(0);
       setActiveReport(null);
+      setRejectEvent(null);
       setCameraResetNonce((n) => n + 1);
       if (showToast) {
         onNotify(
@@ -645,6 +668,7 @@ export function Lab3DTab({
     if (nextMode === mode) return;
     setMode(nextMode);
     setDraggingItemId(null);
+    setRejectEvent(null);
     if (nextMode === 'assemble') {
       setSelectedComponentId(null);
       setShowDataFlow(false);
@@ -957,6 +981,7 @@ export function Lab3DTab({
         if (!nextRequiredStep) return;
         if (itemId !== nextRequiredStep.id) {
           setMistakes((m) => m + 1);
+          triggerReject(itemId, clickedSocketId, currentRotation);
           labSfx.playRuleWarning();
           onNotify('Urutan Melanggar E-Book STMIK AKI', nextRequiredStep.wrongOrderHint, 'warning');
           return;
@@ -1027,12 +1052,14 @@ export function Lab3DTab({
         const chosenMode = JUMPER_SOCKET_TO_MODE[clickedSocketId];
         if (!chosenMode) {
           if (!isFreeRoam) setMistakes((m) => m + 1);
+          triggerReject(itemId, clickedSocketId, currentRotation);
           labSfx.playRuleWarning();
           onNotify('Arahkan ke Blok 8-Pin HDD', targetItem.wrongSocketHint, 'warning');
           return;
         }
         if (!isFreeRoam && chosenMode !== 'master') {
           setMistakes((m) => m + 1);
+          triggerReject(itemId, clickedSocketId, currentRotation);
           labSfx.playRuleWarning();
           onNotify(
             `Salah Kolom Pin (${JUMPER_MODE_LABEL[chosenMode]})`,
@@ -1058,11 +1085,12 @@ export function Lab3DTab({
         return;
       }
 
-      // 4. Two-End IDE 40-Wire Ribbon Data Cable with [R] Pin-1 Red Stripe
+      // 4. Two-End IDE 40-Wire Ribbon Data Cable with [R] Pin-1 Red Stripe & Key Notch on BOTH ends
       if (itemId === 'install-ide-cable') {
         if (!ideEndsConnected.board) {
           if (clickedSocketId !== 'ide-port') {
             if (!isFreeRoam) setMistakes((m) => m + 1);
+            triggerReject(itemId, clickedSocketId, currentRotation);
             labSfx.playRuleWarning();
             onNotify(
               'Pasang Ujung 1 di Motherboard Dulu',
@@ -1073,22 +1101,24 @@ export function Lab3DTab({
           }
           if (!isPartOrientationValid(itemId, currentRotation)) {
             if (!isFreeRoam) setMistakes((m) => m + 1);
+            triggerReject(itemId, clickedSocketId, currentRotation);
             labSfx.playRuleWarning();
             onNotify(
-              'Garis Merah Pin-1 IDE Terbalik!',
+              'Garis Merah Pin-1 & Tonjolan IDE Terbalik!',
               isTouchInput
-                ? 'Ketuk tombol Putar kanan (atau tap 2 jari) hingga garis merah Pin-1 sejajar sisi Pin-1 soket!'
-                : 'Tekan tombol [R] hingga garis merah Pin-1 pada kabel pita IDE sejajar sisi Pin-1 soket!',
+                ? 'Ketuk tombol Putar kanan (atau tap 2 jari) hingga garis merah Pin-1 & tonjolan key sejajar soket!'
+                : 'Tekan tombol [R] hingga garis merah Pin-1 & tonjolan key kabel pita IDE sejajar celah soket!',
               'warning'
             );
             return;
           }
           setIdeEndsConnected({ board: true, hdd: false });
           setSelectedItemId(itemId);
+          setRotationStep(1); // Require aligning End 2 Pin-1 & key notch at the rear HDD socket too!
           labSfx.playMechanicalClick();
           onNotify(
             'Ujung 1 Terpasang (#12 Port IDE)',
-            'Kamera mengarah ke belakang HDD — sambungkan Ujung 2 kabel pita IDE ke port IDE 40-Pin di belakang Harddisk 3.5"!',
+            'Kamera mengarah ke belakang HDD — tekan [R] sejajarkan Pin-1 lalu sambungkan Ujung 2 ke port IDE 40-Pin HDD!',
             'info'
           );
           return;
@@ -1097,10 +1127,24 @@ export function Lab3DTab({
         // End 2: rear HDD IDE 40-Pin port
         if (clickedSocketId !== 'hdd-ide-port') {
           if (!isFreeRoam) setMistakes((m) => m + 1);
+          triggerReject(itemId, clickedSocketId, currentRotation);
           labSfx.playRuleWarning();
           onNotify(
             'Sambungkan Ujung 2 ke Port IDE HDD',
             'Arahkan ujung kedua kabel pita IDE ke port IDE 40-Pin (hitam lebar) di belakang Harddisk 3.5"!',
+            'warning'
+          );
+          return;
+        }
+        if (!isPartOrientationValid(itemId, currentRotation)) {
+          if (!isFreeRoam) setMistakes((m) => m + 1);
+          triggerReject(itemId, clickedSocketId, currentRotation);
+          labSfx.playRuleWarning();
+          onNotify(
+            'Pin-1 Ujung 2 IDE di HDD Terbalik!',
+            isTouchInput
+              ? 'Ketuk tombol Putar kanan hingga garis merah Pin-1 sejajar sisi kanan (dekat Molex) port IDE HDD!'
+              : 'Tekan tombol [R] hingga garis merah Pin-1 & tonjolan key sejajar celah port IDE 40-Pin HDD!',
             'warning'
           );
           return;
@@ -1119,6 +1163,7 @@ export function Lab3DTab({
       if (wireKey) {
         if (!isFPanelZoneId(clickedSocketId)) {
           if (!isFreeRoam) setMistakes((m) => m + 1);
+          triggerReject(itemId, clickedSocketId, currentRotation);
           labSfx.playRuleWarning();
           onNotify('Arahkan ke Pin F_PANEL 9-Pin', targetItem.wrongSocketHint, 'warning');
           return;
@@ -1129,6 +1174,7 @@ export function Lab3DTab({
           ([k, v]) => k !== wireKey && v?.zoneId === clickedSocketId
         );
         if (occupyingWireEntry) {
+          triggerReject(itemId, clickedSocketId, currentRotation);
           labSfx.playRuleWarning();
           onNotify(
             'Blok Pin Sudah Terisi',
@@ -1144,12 +1190,14 @@ export function Lab3DTab({
         if (difficulty === 'practice') {
           if (clickedSocketId !== correctZone) {
             setMistakes((m) => m + 1);
+            triggerReject(itemId, clickedSocketId, currentRotation);
             labSfx.playRuleWarning();
             onNotify('Salah Blok Warna F_PANEL!', targetItem.wrongSocketHint, 'warning');
             return;
           }
           if (!polarityValid) {
             setMistakes((m) => m + 1);
+            triggerReject(itemId, clickedSocketId, currentRotation);
             labSfx.playRuleWarning();
             onNotify(
               'Polaritas LED Terbalik!',
@@ -1193,6 +1241,7 @@ export function Lab3DTab({
       // 6. Standard Hardware Parts (CPU Lever, CPU, Paste, Heatsink, RAM 1/2, CMOS, VGA, HDD Unit, Molex, ATX 24P & 4P)
       if (!doesSimpleSocketMatch(targetItem.targetSocketId, clickedSocketId)) {
         if (!isFreeRoam) setMistakes((m) => m + 1);
+        triggerReject(itemId, clickedSocketId, currentRotation);
         labSfx.playRuleWarning();
         onNotify('Soket Tujuan Salah', targetItem.wrongSocketHint, 'warning');
         return;
@@ -1200,23 +1249,50 @@ export function Lab3DTab({
 
       if (!isPartOrientationValid(itemId, currentRotation)) {
         if (!isFreeRoam) setMistakes((m) => m + 1);
+        triggerReject(itemId, clickedSocketId, currentRotation);
         labSfx.playRuleWarning();
         const isFlipped180 = ((currentRotation % 4) + 4) % 4 === 2;
-        onNotify(
-          itemId === 'install-cpu'
-            ? 'Orientasi Segitiga CPU Belum Cocok'
-            : isFlipped180
-              ? 'Celah Notch RAM Terbalik 180°'
-              : 'Posisi RAM Belum Sejajar',
-          itemId === 'install-cpu'
-            ? isTouchInput
-              ? 'Ketuk tombol Putar kanan (atau tap 2 jari) hingga panah segitiga emas sejajar sudut Pin-1 soket LGA 775!'
-              : 'Tekan tombol [R] hingga panah segitiga emas sejajar sudut Pin-1 soket LGA 775!'
-            : isTouchInput
-              ? 'Ketuk tombol Putar kanan (atau tap 2 jari) hingga panah notch DDR2 tepat di atas tonjolan slot DIMM!'
-              : 'Tekan tombol [R] hingga panah notch DDR2 tepat sejajar di atas tonjolan slot DIMM!',
-          'warning'
-        );
+        if (itemId === 'install-atx-24pin') {
+          onNotify(
+            'Klip Pengunci ATX 24-Pin Terbalik!',
+            isTouchInput
+              ? 'Mentok di dinding soket! Ketuk tombol Putar kanan hingga klip samping ATX 24-Pin menghadap kait pengunci.'
+              : 'Mentok di dinding soket! Tekan tombol [R] hingga klip pengunci ATX 24-Pin sejajar kait soket #14.',
+            'warning'
+          );
+        } else if (itemId === 'install-atx-4pin') {
+          onNotify(
+            'Klip Pengunci ATX 4-Pin 12V Terbalik!',
+            isTouchInput
+              ? 'Mentok! Ketuk tombol Putar kanan hingga klip pengunci ATX 4-Pin sejajar kait soket dekat VRM CPU.'
+              : 'Mentok! Tekan tombol [R] hingga klip pengunci ATX 4-Pin 12V sejajar kait soket kotak putih.',
+            'warning'
+          );
+        } else if (itemId === 'install-hdd-molex') {
+          onNotify(
+            'Bevel D-Shape Molex 4-Pin Terbalik!',
+            isTouchInput
+              ? 'Mentok di sudut miring soket! Ketuk tombol Putar kanan hingga sisi miring D-Shape menghadap atas.'
+              : 'Mentok di sudut miring soket! Tekan tombol [R] hingga sisi miring D-Shape Molex menghadap atas (Kuning 12V kiri).',
+            'warning'
+          );
+        } else {
+          onNotify(
+            itemId === 'install-cpu'
+              ? 'Orientasi Segitiga CPU Belum Cocok'
+              : isFlipped180
+                ? 'Celah Notch RAM Terbalik 180°'
+                : 'Posisi RAM Belum Sejajar',
+            itemId === 'install-cpu'
+              ? isTouchInput
+                ? 'Mentok di tonjolan soket! Ketuk tombol Putar kanan hingga segitiga emas sejajar sudut Pin-1 LGA 775!'
+                : 'Mentok di tonjolan soket! Tekan tombol [R] hingga segitiga emas sejajar sudut Pin-1 LGA 775!'
+              : isTouchInput
+                ? 'Mentok di tonjolan tengah slot! Ketuk tombol Putar kanan hingga celah notch DDR2 pas di atas tonjolan!'
+                : 'Mentok di tonjolan tengah slot! Tekan tombol [R] hingga celah notch DDR2 pas di atas tonjolan DIMM!',
+            'warning'
+          );
+        }
         return;
       }
 
@@ -1243,6 +1319,7 @@ export function Lab3DTab({
       isTouchInput,
       nextRequiredStep,
       onNotify,
+      triggerReject,
     ]
   );
 
@@ -1297,12 +1374,12 @@ export function Lab3DTab({
               : 'Sambungkan Ujung 2 ke port IDE 40-Pin di belakang HDD',
           };
         }
-        if (!ideEndsConnected.board && !isPartOrientationValid(itemId, rot)) {
+        if (!isPartOrientationValid(itemId, rot)) {
           return {
             state: 'invalid',
             reason: isTouchInput
-              ? 'Garis merah Pin-1 IDE terbalik — tap 2 jari atau ketuk Putar!'
-              : 'Garis merah Pin-1 IDE terbalik — tekan [R]!',
+              ? 'Garis merah Pin-1 & tonjolan IDE terbalik — tap 2 jari atau ketuk Putar!'
+              : 'Garis merah Pin-1 & tonjolan IDE terbalik — tekan [R]!',
           };
         }
         return {
@@ -1360,6 +1437,30 @@ export function Lab3DTab({
         return { state: 'invalid', reason: 'Soket tidak cocok untuk komponen ini' };
       }
       if (!isPartOrientationValid(itemId, rot)) {
+        if (itemId === 'install-atx-24pin') {
+          return {
+            state: 'invalid',
+            reason: isTouchInput
+              ? 'Klip pengunci ATX 24-Pin terbalik — tap 2 jari atau ketuk Putar!'
+              : 'Klip pengunci ATX 24-Pin terbalik — tekan [R]!',
+          };
+        }
+        if (itemId === 'install-atx-4pin') {
+          return {
+            state: 'invalid',
+            reason: isTouchInput
+              ? 'Klip pengunci ATX 4-Pin terbalik — tap 2 jari atau ketuk Putar!'
+              : 'Klip pengunci ATX 4-Pin terbalik — tekan [R]!',
+          };
+        }
+        if (itemId === 'install-hdd-molex') {
+          return {
+            state: 'invalid',
+            reason: isTouchInput
+              ? 'Bevel D-Shape Molex terbalik — tap 2 jari atau ketuk Putar!'
+              : 'Bevel D-Shape Molex terbalik — tekan [R]!',
+          };
+        }
         const isRam = itemId === 'install-ram-1' || itemId === 'install-ram-2';
         const isFlipped180 = ((rot % 4) + 4) % 4 === 2;
         return {
@@ -1570,6 +1671,7 @@ export function Lab3DTab({
           dragInitialClientPos={dragInitialClientPos}
           dragRotationStep={rotationStep}
           isHeldPartAligned={isHeldPartAligned}
+          rejectEvent={rejectEvent}
           dockHeightPx={dockHeightPx}
           canRotateActive={canRotateActive}
           onRotateActivePart={handleRotatePart}
