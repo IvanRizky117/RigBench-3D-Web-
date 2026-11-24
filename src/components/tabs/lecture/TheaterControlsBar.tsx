@@ -37,7 +37,7 @@ interface TheaterControlsBarProps {
   hideChrome: boolean;
 }
 
-const SPEEDS: PlaybackSpeed[] = [0.75, 1, 1.25, 1.5];
+const SPEEDS: PlaybackSpeed[] = [0.75, 0.9, 1, 1.25, 1.5];
 
 const GUIDE_MODES: Array<{
   id: TheaterGuideMode;

@@ -17,13 +17,19 @@ export function TryOutResultsPanel({
 }: TryOutResultsPanelProps) {
   const [reviewFilter, setReviewFilter] = useState<'all' | 'essay' | 'abc'>('all');
 
+  const evaluatedEssayIds = new Set(attempt.essayEvaluations.map((e) => e.questionId));
+  const evaluatedAbcIds = new Set(attempt.abcEvaluations.map((e) => e.questionId));
+  const shownEssays = ESSAY_QUESTIONS.filter((q) => evaluatedEssayIds.has(q.id));
+  const shownAbcs = ABC_QUESTIONS.filter((q) => evaluatedAbcIds.has(q.id));
+
   return (
     <div className="space-y-6">
       {/* Clean Score Summary Header */}
       <div className="datacore-card rounded-2xl p-6 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="space-y-1">
           <p className="font-mono text-[11px] text-[#38BDF8]">
-            HASIL TRY OUT · {formatShortDate(attempt.completedAtIso)}
+            HASIL TRY OUT{attempt.scopeLabel ? ` · ${attempt.scopeLabel.toUpperCase()}` : ''} ·{' '}
+            {formatShortDate(attempt.completedAtIso)}
           </p>
           <div className="flex flex-wrap items-baseline gap-3">
             <span className="font-mono text-4xl font-semibold text-[#F8FAFC] tabular-nums">
@@ -70,9 +76,9 @@ export function TryOutResultsPanel({
       <div className="flex flex-wrap items-center gap-2">
         {(
           [
-            { id: 'all', label: `Semua (${ESSAY_QUESTIONS.length + ABC_QUESTIONS.length})` },
-            { id: 'essay', label: `Rubrik Essay (${ESSAY_QUESTIONS.length})` },
-            { id: 'abc', label: `Pilihan Ganda (${ABC_QUESTIONS.length})` },
+            { id: 'all', label: `Semua (${shownEssays.length + shownAbcs.length})` },
+            { id: 'essay', label: `Rubrik Essay (${shownEssays.length})` },
+            { id: 'abc', label: `Pilihan Ganda (${shownAbcs.length})` },
           ] as const
         ).map((item) => (
           <button
@@ -93,7 +99,7 @@ export function TryOutResultsPanel({
       {/* Compact Flat-Row Essay Rubric Breakdown */}
       {(reviewFilter === 'all' || reviewFilter === 'essay') && (
         <div className="datacore-card rounded-2xl divide-y divide-[#3B82F6]/15 overflow-hidden">
-          {ESSAY_QUESTIONS.map((q, idx) => {
+          {shownEssays.map((q, idx) => {
             const evalRes = attempt.essayEvaluations.find((e) => e.questionId === q.id);
             const score = evalRes?.scorePercent ?? 0;
             const userAns = essayAnswers[q.id];
@@ -174,7 +180,7 @@ export function TryOutResultsPanel({
       {/* Compact Flat-Row ABC Results */}
       {(reviewFilter === 'all' || reviewFilter === 'abc') && (
         <div className="datacore-card rounded-2xl divide-y divide-[#3B82F6]/15 overflow-hidden">
-          {ABC_QUESTIONS.map((q, idx) => {
+          {shownAbcs.map((q, idx) => {
             const evalRes = attempt.abcEvaluations.find((e) => e.questionId === q.id);
             const isCorrect = evalRes?.isCorrect ?? false;
             return (

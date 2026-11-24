@@ -1,17 +1,21 @@
 import type {
   AtxPinSpec,
+  ClusterId,
   CpuMilestone,
   CrackToolSpec,
   CurriculumCluster,
   EulaClause,
+  MaterialTrackId,
   PiracyPillar,
   RamGenerationSpec,
   TroubleshootingCase,
 } from '../types/rigbench';
+import { EXTRA_CURRICULUM_CLUSTERS } from './extraCurriculumData.ts';
 
-export const CURRICULUM_CLUSTERS: CurriculumCluster[] = [
+const PRAKTIKUM_CLUSTERS: CurriculumCluster[] = [
   {
     id: 'cluster-1',
+    track: 'praktikum',
     number: '01',
     shortTitle: 'Mainboard & Chipset',
     title: 'Anatomi Mainboard (24 Titik) & Arsitektur Chipset',
@@ -298,6 +302,20 @@ export const CURRICULUM_CLUSTERS: CurriculumCluster[] = [
     ],
   },
 ];
+
+export const CURRICULUM_CLUSTERS: CurriculumCluster[] = [
+  ...PRAKTIKUM_CLUSTERS.map((cluster) => ({
+    ...cluster,
+    track: 'praktikum' as MaterialTrackId,
+  })),
+  ...EXTRA_CURRICULUM_CLUSTERS,
+];
+
+export function getClusterTrack(clusterId: ClusterId): MaterialTrackId {
+  if (clusterId.startsWith('arch-')) return 'arsitektur';
+  if (clusterId.startsWith('hist-')) return 'sejarah';
+  return 'praktikum';
+}
 
 export const CPU_TIMELINE: CpuMilestone[] = [
   { year: 1985, vendor: 'Intel', model: 'i386', note: 'Arsitektur 32-bit x86 pertama Intel' },

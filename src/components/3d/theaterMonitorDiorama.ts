@@ -261,7 +261,7 @@ export function buildMonitorTerminalDiorama(
   maxAniso: number,
   textureScale: number
 ): BuiltTheaterDiorama {
-  const tracker = new DioramaResourceTracker();
+  const tracker = new DioramaResourceTracker(textureScale);
   const rootGroup = new THREE.Group();
   addStudioWorkbench(tracker, rootGroup, maxAniso, textureScale);
 
@@ -311,7 +311,7 @@ export function buildMonitorTerminalDiorama(
   screenCanvas.width = 1024;
   screenCanvas.height = 576;
   const screenCtx = screenCanvas.getContext('2d');
-  const screenTex = tracker.tex(new THREE.CanvasTexture(screenCanvas));
+  const screenTex = tracker.tex(new THREE.CanvasTexture(screenCanvas), true);
   screenTex.colorSpace = THREE.SRGBColorSpace;
   screenTex.anisotropy = maxAniso;
 
@@ -425,7 +425,8 @@ export function buildMonitorTerminalDiorama(
     update(elapsed, dt, mechAction, anchor, domainColor, isPlaying) {
       updateStudioAccentLight(accentLight, elapsed, dt, anchor, domainColor);
 
-      const cursorOn = isPlaying ? Math.floor(elapsed * 2) % 2 === 0 : true;
+      const cursorHz = tracker.textureScale < 1 ? 1 : 2;
+      const cursorOn = isPlaying ? Math.floor(elapsed * cursorHz) % 2 === 0 : true;
       const actionKey = `${mechAction ?? 'default'}`;
       if (screenCtx && (actionKey !== lastActionKey || cursorOn !== lastCursorState)) {
         lastActionKey = actionKey;

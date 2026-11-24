@@ -23,10 +23,13 @@ const QUALITY_STORAGE_KEY = 'rigbench_graphics_quality_v1';
 const ENTRY_GPU_PATTERN =
   /Mali-G5[127]|Mali-G31|Mali-T|PowerVR|IMG|Adreno \(TM\) [345]\d\d|Adreno \(TM\) 61[0-9]|SwiftShader|llvmpipe|softpipe/i;
 
+const SOFTWARE_GL_PATTERN = /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i;
+
 export interface DetectedDeviceTier {
   tier: DevicePerformanceTier;
   isMobileViewport: boolean;
   isLowEndMobile: boolean;
+  isSoftwareGl: boolean;
 }
 
 let cachedTierResult: DetectedDeviceTier | null = null;
@@ -67,7 +70,7 @@ export function saveGraphicsQualityMode(mode: GraphicsQualityMode): void {
  */
 export function detectDeviceTier(): DetectedDeviceTier {
   if (typeof window === 'undefined') {
-    return { tier: 'high', isMobileViewport: false, isLowEndMobile: false };
+    return { tier: 'high', isMobileViewport: false, isLowEndMobile: false, isSoftwareGl: false };
   }
 
   if (cachedTierResult) {
@@ -87,12 +90,14 @@ export function detectDeviceTier(): DetectedDeviceTier {
     (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
 
   let gpuName = '';
+  let webglAvailable = false;
   try {
     const canvas = document.createElement('canvas');
     const gl =
       canvas.getContext('webgl2') ||
       (canvas.getContext('webgl') as WebGLRenderingContext | null);
     if (gl) {
+      webglAvailable = true;
       const ext = gl.getExtension('WEBGL_debug_renderer_info');
       const param = ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER;
       gpuName = String(gl.getParameter(param) ?? '');
@@ -102,6 +107,7 @@ export function detectDeviceTier(): DetectedDeviceTier {
     gpuName = '';
   }
 
+  const isSoftwareGl = !webglAvailable || SOFTWARE_GL_PATTERN.test(gpuName);
   const isEntryGpu = ENTRY_GPU_PATTERN.test(gpuName);
   const isMemoryConstrained = deviceMem <= 4;
   const isCoreConstrained = cores <= 4;
@@ -117,8 +123,13 @@ export function detectDeviceTier(): DetectedDeviceTier {
     tier,
     isMobileViewport,
     isLowEndMobile: tier === 'low' && isMobileViewport,
+    isSoftwareGl,
   };
   return cachedTierResult;
+}
+
+export function isSoftwareWebGLCached(): boolean {
+  return detectDeviceTier().isSoftwareGl;
 }
 
 /**

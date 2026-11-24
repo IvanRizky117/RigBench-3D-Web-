@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle, Clock, Warning } from '@phosphor-icons/react';
-import { CURRICULUM_CLUSTERS } from '../../data/curriculumData';
-import type { ClusterId } from '../../types/rigbench';
+import { CURRICULUM_CLUSTERS, getClusterTrack } from '../../data/curriculumData';
+import { MATERIAL_TRACKS } from '../../data/extraCurriculumData';
+import type { ClusterId, MaterialTrackId } from '../../types/rigbench';
 import { useSpeechLecture } from '../../hooks/useSpeechLecture';
 import { TheaterStagePlayer } from './lecture/TheaterStagePlayer';
 import { ClusterInteractiveLabs } from './lecture/ClusterInteractiveLabs';
@@ -39,6 +40,10 @@ export function LectureTab({
 }: LectureTabProps) {
   const cluster =
     CURRICULUM_CLUSTERS.find((c) => c.id === activeClusterId) ?? CURRICULUM_CLUSTERS[0];
+  const activeTrack: MaterialTrackId = getClusterTrack(cluster.id);
+  const trackClusters = CURRICULUM_CLUSTERS.filter((c) => getClusterTrack(c.id) === activeTrack);
+  const activeTrackMeta =
+    MATERIAL_TRACKS.find((t) => t.id === activeTrack) ?? MATERIAL_TRACKS[0];
 
   const [segmentIndex, setSegmentIndex] = useState(0);
   const [completedSegmentIds, setCompletedSegmentIds] = useState<string[]>(readCompletedSegments);
@@ -46,6 +51,14 @@ export function LectureTab({
   useEffect(() => {
     setSegmentIndex(0);
   }, [activeClusterId]);
+
+  const handleSelectTrack = (trackId: MaterialTrackId) => {
+    if (trackId === activeTrack) return;
+    const firstCluster = CURRICULUM_CLUSTERS.find((c) => getClusterTrack(c.id) === trackId);
+    if (firstCluster) {
+      onSelectCluster(firstCluster.id);
+    }
+  };
 
   const speech = useSpeechLecture({
     segments: cluster.segments,
@@ -67,7 +80,12 @@ export function LectureTab({
       });
     },
     onFallbackNotice: (reason) => {
-      onNotify('Mode Suara Lokal', reason, 'info');
+      const isAutoplayBlocked = /putar otomatis|ketuk tombol putar/i.test(reason);
+      onNotify(
+        isAutoplayBlocked ? 'Ketuk Putar untuk Suara AI' : 'Mode Suara Lokal',
+        reason,
+        'info'
+      );
     },
   });
 
@@ -75,9 +93,59 @@ export function LectureTab({
 
   return (
     <div className="space-y-6 pb-24 md:pb-16">
-      {/* Compact 7-Cluster Selector Strip (Zero Wall-of-Text, 44px+ touch targets) */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-        {CURRICULUM_CLUSTERS.map((item) => {
+      {/* 3 Sub-Tab Switcher: Praktikum PC · Arsitektur Komputer · Sejarah PC */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          role="tablist"
+          aria-label="Sub-tab topik materi"
+          className="inline-flex flex-wrap gap-1 rounded-xl bg-[#070D1B] p-1 border border-white/[0.08]"
+        >
+          {MATERIAL_TRACKS.map((track) => {
+            const trackItems = CURRICULUM_CLUSTERS.filter((c) => getClusterTrack(c.id) === track.id);
+            const trackDoneCount = trackItems.filter((c) => completedClusters.includes(c.id)).length;
+            const selected = track.id === activeTrack;
+            return (
+              <button
+                key={track.id}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => handleSelectTrack(track.id)}
+                className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold whitespace-nowrap transition-all press-feedback ${
+                  selected
+                    ? 'bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-white shadow-[0_0_18px_rgba(37,99,235,0.35)]'
+                    : 'text-[#94A3B8] hover:text-[#F8FAFC]'
+                }`}
+              >
+                <span>{track.label}</span>
+                <span
+                  className={`font-mono text-[11px] tabular-nums ${
+                    selected ? 'text-[#BAE6FD]' : 'text-[#64748B]'
+                  }`}
+                >
+                  {trackDoneCount}/{trackItems.length}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <p className="text-xs text-[#94A3B8]">
+          <span className="font-mono font-semibold text-[#38BDF8]">{activeTrackMeta.sourceLabel}</span>
+          <span className="mx-2" aria-hidden="true">·</span>
+          <span>{activeTrackMeta.subtitle}</span>
+        </p>
+      </div>
+
+      {/* Dynamic Cluster Selector Strip for Active Sub-Tab */}
+      <div
+        className={`grid gap-2 ${
+          trackClusters.length >= 6
+            ? 'grid-cols-2 sm:grid-cols-4 lg:grid-cols-7'
+            : 'grid-cols-1 sm:grid-cols-3'
+        }`}
+      >
+        {trackClusters.map((item) => {
           const active = item.id === cluster.id;
           const done = completedClusters.includes(item.id);
           const doneCount = item.segments.filter((s) => completedSegmentIds.includes(s.id)).length;

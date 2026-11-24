@@ -1,3 +1,5 @@
+import { computeSpokenWordWeight } from './waveformSync';
+
 export interface SubtitleCue {
   id: string;
   index: number;
@@ -70,22 +72,33 @@ export function buildSubtitleCues(narration: string): SubtitleCue[] {
     }
   }
 
-  // Compute weighted character & word offsets so seeking and boundary sync match accurately
-  const totalWeight = rawLines.reduce((sum, line) => sum + Math.max(1, line.length), 0);
+  const lineEntries = rawLines.map((line) => {
+    const words = line.split(' ').filter(Boolean);
+    const spokenWeight = Math.max(
+      1,
+      words.reduce((sum, w) => sum + computeSpokenWordWeight(w), 0)
+    );
+    return { line, words, spokenWeight };
+  });
+
+  // Compute phonetic spoken weights so seeking and boundary percentages match spoken duration
+  const totalWeight = Math.max(
+    1,
+    lineEntries.reduce((sum, item) => sum + item.spokenWeight, 0)
+  );
   let cursorWord = 0;
   let cursorChar = 0;
   let accWeight = 0;
 
-  return rawLines.map((line, index) => {
-    const words = line.split(' ').filter(Boolean);
+  return lineEntries.map(({ line, words, spokenWeight }, index) => {
     const startWordIndex = cursorWord;
     const endWordIndex = cursorWord + Math.max(0, words.length - 1);
     const startCharIndex = cursorChar;
     const endCharIndex = cursorChar + line.length;
 
     const startPct = (accWeight / totalWeight) * 100;
-    accWeight += Math.max(1, line.length);
-    const endPct = index === rawLines.length - 1 ? 100 : (accWeight / totalWeight) * 100;
+    accWeight += spokenWeight;
+    const endPct = index === lineEntries.length - 1 ? 100 : (accWeight / totalWeight) * 100;
 
     cursorWord += words.length;
     cursorChar += line.length + 1;
@@ -125,18 +138,11 @@ export function findActiveCue(
 }
 
 /**
- * Estimates relative spoken weight of a word based on character length and
- * trailing punctuation pauses so fallback word highlighting tracks natural speech.
+ * Estimates relative spoken weight of a word using Indonesian phonetic expansion
+ * so local Web Speech fallback and silent-clock pacing match real spoken syllables.
  */
 export function getWordSpeechWeight(word: string): number {
-  const clean = word.replace(/[.,;:!?()]/g, '');
-  let weight = Math.max(2, clean.length);
-  if (/[.!?]$/.test(word)) {
-    weight += 5.5;
-  } else if (/[,;:]$/.test(word)) {
-    weight += 3;
-  }
-  return weight;
+  return computeSpokenWordWeight(word);
 }
 
 export interface CueSpeechMetrics {

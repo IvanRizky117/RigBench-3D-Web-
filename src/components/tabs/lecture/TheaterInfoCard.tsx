@@ -1,5 +1,6 @@
 import {
   CheckCircle,
+  ClockCounterClockwise,
   Cpu,
   FlowArrow,
   HardDrives,
@@ -67,6 +68,16 @@ const VARIANT_META: Record<
     label: 'HUKUM & SIBER',
     tintBg: 'linear-gradient(165deg, rgba(38,13,26,0.96) 0%, rgba(7,11,22,0.98) 100%)',
     icon: ShieldWarning,
+  },
+  'arch-flow': {
+    label: 'ARSITEKTUR SISTEM',
+    tintBg: 'linear-gradient(165deg, rgba(12,30,58,0.96) 0%, rgba(6,12,24,0.98) 100%)',
+    icon: FlowArrow,
+  },
+  'history-museum': {
+    label: 'MUSEUM SEJARAH PC',
+    tintBg: 'linear-gradient(165deg, rgba(34,23,12,0.96) 0%, rgba(8,12,24,0.98) 100%)',
+    icon: ClockCounterClockwise,
   },
 };
 

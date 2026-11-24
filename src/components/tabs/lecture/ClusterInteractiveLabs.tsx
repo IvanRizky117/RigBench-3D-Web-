@@ -27,6 +27,9 @@ import {
   decodeCeramicCapacitor,
   RESISTOR_COLORS,
 } from '../../../utils/electronicsCalc';
+import { ArchitectureLabs } from './ArchitectureLabs';
+import { HistoryLabs } from './HistoryLabs';
+import { ClusterQuickQuiz } from './ClusterQuickQuiz';
 
 interface ClusterInteractiveLabsProps {
   clusterId: ClusterId;
@@ -103,6 +106,26 @@ export function ClusterInteractiveLabs({
       return next;
     });
   };
+
+  // --- SUB-TAB 2: MODUL 1 — ARSITEKTUR KOMPUTER (A1–A3) + CONTOH SOAL INSTAN ---
+  if (clusterId.startsWith('arch-')) {
+    return (
+      <div className="space-y-6">
+        <ArchitectureLabs clusterId={clusterId} onNotify={onNotify} />
+        <ClusterQuickQuiz clusterId={clusterId} />
+      </div>
+    );
+  }
+
+  // --- SUB-TAB 3: MODUL 6 — SEJARAH KOMPUTER (S1–S3) + CONTOH SOAL INSTAN ---
+  if (clusterId.startsWith('hist-')) {
+    return (
+      <div className="space-y-6">
+        <HistoryLabs clusterId={clusterId} />
+        <ClusterQuickQuiz clusterId={clusterId} />
+      </div>
+    );
+  }
 
   // --- KLASTER 1: 24 Titik Mainboard + Quick 3D Jump ---
   if (clusterId === 'cluster-1') {

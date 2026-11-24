@@ -8,7 +8,20 @@ interface CachedAudioRecord {
   createdAt: number;
 }
 
+const MAX_MEMORY_CLIPS = 3;
 const memoryFallback = new Map<string, Blob>();
+
+function rememberAudioClip(key: string, blob: Blob): void {
+  if (memoryFallback.has(key)) {
+    memoryFallback.delete(key);
+  }
+  memoryFallback.set(key, blob);
+  while (memoryFallback.size > MAX_MEMORY_CLIPS) {
+    const oldestKey = memoryFallback.keys().next().value;
+    if (oldestKey === undefined) break;
+    memoryFallback.delete(oldestKey);
+  }
+}
 
 function openCacheDb(): Promise<IDBDatabase | null> {
   if (typeof window === 'undefined' || typeof indexedDB === 'undefined') {
@@ -41,7 +54,10 @@ export function buildAudioCacheKey(
 
 export async function getCachedAudioClip(key: string): Promise<Blob | null> {
   const memHit = memoryFallback.get(key);
-  if (memHit) return memHit;
+  if (memHit) {
+    rememberAudioClip(key, memHit);
+    return memHit;
+  }
 
   const db = await openCacheDb();
   if (!db) return null;
@@ -54,7 +70,7 @@ export async function getCachedAudioClip(key: string): Promise<Blob | null> {
       req.onsuccess = () => {
         const record = req.result as CachedAudioRecord | undefined;
         if (record?.blob instanceof Blob && record.blob.size > 0) {
-          memoryFallback.set(key, record.blob);
+          rememberAudioClip(key, record.blob);
           resolve(record.blob);
         } else {
           resolve(null);
@@ -69,7 +85,7 @@ export async function getCachedAudioClip(key: string): Promise<Blob | null> {
 
 export async function setCachedAudioClip(key: string, blob: Blob): Promise<void> {
   if (!(blob instanceof Blob) || blob.size === 0) return;
-  memoryFallback.set(key, blob);
+  rememberAudioClip(key, blob);
 
   const db = await openCacheDb();
   if (!db) return;

@@ -1,4 +1,9 @@
 import type { AbcQuestion, EssayQuestion, GlossaryItem } from '../types/rigbench';
+import {
+  EXTRA_ABC_QUESTIONS,
+  EXTRA_ESSAY_QUESTIONS,
+  EXTRA_GLOSSARY_ITEMS,
+} from './extraExamBankData';
 
 export const ESSAY_QUESTIONS: EssayQuestion[] = [
   {
@@ -731,6 +736,7 @@ export const ESSAY_QUESTIONS: EssayQuestion[] = [
       'Resistor Coklat (1) – Hitam (0) – Merah (×100) – Perak (±10%) bernilai 10 × 100 = 1.000 Ohm (1 kΩ). Dengan toleransi 10% (±100 Ω), nilai aslinya berada pada rentang 900 Ohm sampai 1.100 Ohm. Kapasitor keramik berkode 103 dibaca: digit I = 1, digit II = 0, digit III = 3 nol dalam piko Farad → 10.000 pF = 10 nF = 0,01 µF. Kesimpulan pengukuran ELCO pada Ohmmeter: (1) Jarum bergerak menunjuk angka lalu kembali ke tempat semula = ELCO Baik; (2) Jarum bergerak menunjuk angka tetapi tidak kembali ke semula = ELCO Bocor; (3) Jarum tidak bergerak sama sekali = ELCO Putus; (4) Jarum menunjuk angka nol = ELCO Short.',
     examTip: 'Sertakan konversi satuan lengkap kapasitor (pF → nF → µF) dan keempat kondisi jarum ELCO.',
   },
+  ...EXTRA_ESSAY_QUESTIONS,
 ];
 
 export const ABC_QUESTIONS: AbcQuestion[] = [
@@ -959,6 +965,7 @@ export const ABC_QUESTIONS: AbcQuestion[] = [
     correctKey: 'B',
     explanation: 'Sesuai modul halaman 40: cek voltase baterai CMOS CR2032 dengan AVO meter; apabila sudah di bawah 2 Volt maka harus diganti.',
   },
+  ...EXTRA_ABC_QUESTIONS,
 ];
 
 export const GLOSSARY_ITEMS: GlossaryItem[] = [
@@ -1127,4 +1134,5 @@ export const GLOSSARY_ITEMS: GlossaryItem[] = [
     category: 'EULA & Keamanan Siber',
     definition: 'Ransomware mengenkripsi seluruh dokumen penting korban dan menuntut tebusan uang; Backdoor adalah pintu belakang rahasia untuk kendali jarak jauh ilegal.',
   },
+  ...EXTRA_GLOSSARY_ITEMS,
 ];

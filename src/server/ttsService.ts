@@ -6,7 +6,11 @@ import { getTutorPersona, type TutorPersonaSpec } from '../data/ttsPersonas.ts';
 import { formatIndonesianSpeechText, hashSpeechScript } from '../utils/indonesianPhonetics.ts';
 
 const TTS_MODEL = 'gemini-3.8-flash-lite-tts';
-const CACHE_DIR = path.resolve(process.cwd(), '.tts-cache');
+const CACHE_DIR =
+  process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME
+    ? '/tmp/.tts-cache'
+    : path.resolve(process.cwd(), '.tts-cache');
+const MAX_SERVER_MEMORY_CLIPS = 24;
 const MAX_RETRIES = 2;
 const BASE_BACKOFF_MS = 900;
 const RATE_LIMIT_COOLDOWN_MS = 20_000;
@@ -35,6 +39,18 @@ export class TtsServiceError extends Error {
 const memoryCache = new Map<string, Buffer>();
 const inFlightRequests = new Map<string, Promise<Buffer>>();
 let cooldownUntilMs = 0;
+
+function rememberServerAudio(cacheKey: string, wavBuffer: Buffer): void {
+  if (memoryCache.has(cacheKey)) {
+    memoryCache.delete(cacheKey);
+  }
+  memoryCache.set(cacheKey, wavBuffer);
+  while (memoryCache.size > MAX_SERVER_MEMORY_CLIPS) {
+    const oldestKey = memoryCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    memoryCache.delete(oldestKey);
+  }
+}
 
 let sharedClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI | null {
@@ -217,6 +233,7 @@ export async function getOrGenerateSegmentAudio(
 
   const memHit = memoryCache.get(cacheKey);
   if (memHit) {
+    rememberServerAudio(cacheKey, memHit);
     return { wavBuffer: memHit, cacheHit: true, cacheKey };
   }
 
@@ -224,7 +241,7 @@ export async function getOrGenerateSegmentAudio(
   try {
     const diskHit = await fs.readFile(diskPath);
     if (diskHit.length > 44) {
-      memoryCache.set(cacheKey, diskHit);
+      rememberServerAudio(cacheKey, diskHit);
       return { wavBuffer: diskHit, cacheHit: true, cacheKey };
     }
   } catch {
@@ -244,7 +261,7 @@ export async function getOrGenerateSegmentAudio(
   if (!pending) {
     pending = (async () => {
       const wavBuffer = await synthesizeWithBackoff(ai, spokenText, persona);
-      memoryCache.set(cacheKey, wavBuffer);
+      rememberServerAudio(cacheKey, wavBuffer);
       try {
         await ensureCacheDir();
         await fs.writeFile(diskPath, wavBuffer);

@@ -5,6 +5,17 @@
 [build.environment]
   NODE_VERSION = "22"
 
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# API TTS Serverless Function (harus sebelum fallback SPA /*)
+[[redirects]]
+  from = "/api/tts/*"
+  to = "/.netlify/functions/tts"
+  status = 200
+  force = true
+
 # SPA client-side routing fallback
 [[redirects]]
   from = "/*"
@@ -21,6 +32,11 @@
     Strict-Transport-Security = "max-age=31536000; includeSubDomains"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
     Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob: data:; connect-src 'self' blob: https://fonts.googleapis.com https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+
+[[headers]]
+  for = "/api/tts/status"
+  [headers.values]
+    Cache-Control = "no-store"
 
 # Immutable caching for Vite hashed static bundles
 [[headers]]

@@ -1,11 +1,14 @@
 import { MAINBOARD_COMPONENTS } from './mainboardData';
 import type { TheaterVisualType } from '../types/rigbench';
+import { EXTRA_THEATER_DIRECTOR_PLANS } from './extraTheaterDirectorPlans';
 import {
+  alignTimelineToWavProfile,
   buildPhoneticWordTimeline,
   findPhraseStartWordIndex,
   snapKeyframePctsToWaveform,
   warpWordTimelineToKeyframes,
   type PhoneticWordTiming,
+  type WavAudioProfile,
 } from '../utils/waveformSync';
 
 export type TheaterSceneKind =
@@ -17,7 +20,13 @@ export type TheaterSceneKind =
   | 'electronics-diorama'
   | 'monitor-os'
   | 'monitor-eula'
-  | 'monitor-crack';
+  | 'monitor-crack'
+  | 'arch-bus-diorama'
+  | 'arch-perf-diorama'
+  | 'arch-parallel-diorama'
+  | 'history-mech-diorama'
+  | 'history-gen5-diorama'
+  | 'history-class-sw-diorama';
 
 export type TheaterDomainColor =
   | '#38BDF8'
@@ -34,7 +43,9 @@ export type TheaterCardVariant =
   | 'os-pipeline'
   | 'troubleshoot-meter'
   | 'electronics'
-  | 'legal-cyber';
+  | 'legal-cyber'
+  | 'arch-flow'
+  | 'history-museum';
 
 export type TheaterFocusPlane = 'xz' | 'xy-back' | 'xy-front';
 
@@ -1684,6 +1695,7 @@ export const THEATER_DIRECTOR_PLANS: Record<TheaterVisualType, SegmentDirectorPl
       },
     ],
   },
+  ...EXTRA_THEATER_DIRECTOR_PLANS,
 };
 
 export interface ResolvedSegmentDirector {
@@ -1702,10 +1714,14 @@ export interface ResolvedSegmentDirector {
 export function resolveSegmentKeyframes(
   visualType: TheaterVisualType,
   narration: string,
-  wavPausePcts: number[] = []
+  wavPausePcts: number[] = [],
+  wavProfile: WavAudioProfile | null = null
 ): ResolvedSegmentDirector {
   const plan = THEATER_DIRECTOR_PLANS[visualType];
   const baseWordTimeline = buildPhoneticWordTimeline(narration);
+  const sentenceAlignedTimeline = wavProfile
+    ? alignTimelineToWavProfile(baseWordTimeline, wavProfile)
+    : baseWordTimeline;
 
   let searchCursor = 0;
   const preliminary = plan.keyframes.map((kf, idx) => {
@@ -1719,9 +1735,9 @@ export function resolveSegmentKeyframes(
     }
 
     const foundIdx = findPhraseStartWordIndex(narration, kf.triggerPhrase, searchCursor);
-    if (foundIdx >= 0 && foundIdx < baseWordTimeline.length) {
+    if (foundIdx >= 0 && foundIdx < sentenceAlignedTimeline.length) {
       searchCursor = foundIdx + 1;
-      const pct = baseWordTimeline[foundIdx].startPct;
+      const pct = sentenceAlignedTimeline[foundIdx].startPct;
       return {
         ...kf,
         basePct: pct,
@@ -1731,7 +1747,7 @@ export function resolveSegmentKeyframes(
     }
 
     // Fallback to declared fallbackPct if phrase ever differs
-    const approxIdx = baseWordTimeline.findIndex((w) => w.startPct >= kf.fallbackPct);
+    const approxIdx = sentenceAlignedTimeline.findIndex((w) => w.startPct >= kf.fallbackPct);
     return {
       ...kf,
       basePct: kf.fallbackPct,
@@ -1740,9 +1756,17 @@ export function resolveSegmentKeyframes(
     };
   });
 
+  if (wavProfile) {
+    return {
+      plan,
+      keyframes: preliminary,
+      hasWavSnapping: true,
+      wordTimeline: sentenceAlignedTimeline,
+    };
+  }
+
   const basePcts = preliminary.map((k) => k.basePct ?? k.startPct);
   const hasWavSnapping = wavPausePcts.length > 0;
-  // Snap non-zero keyframes to nearest genuine WAV silence pause when decoded WAV boundaries exist
   const snappedPcts = hasWavSnapping
     ? snapKeyframePctsToWaveform(basePcts, wavPausePcts)
     : basePcts;

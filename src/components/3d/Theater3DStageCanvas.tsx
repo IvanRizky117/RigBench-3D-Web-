@@ -8,7 +8,7 @@ import type {
   TheaterSceneKind,
 } from '../../data/theaterDirectorTimeline';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
-import { resolveRenderProfile } from '../../utils/deviceTier';
+import { isSoftwareWebGLCached, resolveRenderProfile } from '../../utils/deviceTier';
 import {
   buildStudioMotherboard,
   type BuiltStudioMotherboard,
@@ -20,6 +20,12 @@ import {
   buildPsuDiorama,
   buildRamDiorama,
 } from './theaterDioramas';
+import { buildStoryArchUnitsScene } from './storyArchUnitsScene';
+import { buildStoryArchPerfScene } from './storyArchPerfScene';
+import { buildStoryArchParallelScene } from './storyArchParallelScene';
+import { buildStoryHistoryMechScene } from './storyHistoryMechScene';
+import { buildStoryHistoryGen5Scene } from './storyHistoryGen5Scene';
+import { buildStoryHistoryClassScene } from './storyHistoryClassScene';
 import { buildMonitorTerminalDiorama } from './theaterMonitorDiorama';
 import type { BuiltTheaterDiorama } from './theaterDioramaCore';
 import { createTheaterFocusMarker } from './theaterFocusMarker';
@@ -27,6 +33,8 @@ import { createTheaterFocusMarker } from './theaterFocusMarker';
 interface Theater3DStageCanvasProps {
   sceneKind: TheaterSceneKind;
   keyframe: DirectorKeyframe;
+  keyframeIndex?: number;
+  progressPct?: number;
   guideMode: TheaterGuideMode;
   isPlaying: boolean;
   resyncSignal: number;
@@ -43,23 +51,11 @@ const _tipWorld = new THREE.Vector3();
 const _compBox = new THREE.Box3();
 const _compSize = new THREE.Vector3();
 
-function detectSoftwareGl(): boolean {
-  try {
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-    if (!gl) return true;
-    const ext = gl.getExtension('WEBGL_debug_renderer_info');
-    if (!ext) return false;
-    const renderer = String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '');
-    return /SwiftShader|llvmpipe|Software|Microsoft Basic Render/i.test(renderer);
-  } catch {
-    return true;
-  }
-}
-
 export function Theater3DStageCanvas({
   sceneKind,
   keyframe,
+  keyframeIndex = 0,
+  progressPct = 0,
   guideMode,
   isPlaying,
   resyncSignal,
@@ -72,6 +68,8 @@ export function Theater3DStageCanvas({
 
   // Mutable refs read inside 60fps loop without triggering WebGL re-initialization
   const keyframeRef = useRef<DirectorKeyframe>(keyframe);
+  const keyframeIndexRef = useRef<number>(keyframeIndex);
+  const progressPctRef = useRef<number>(progressPct);
   const guideModeRef = useRef<TheaterGuideMode>(guideMode);
   const isPlayingRef = useRef<boolean>(isPlaying);
   const manualOrbitRef = useRef<boolean>(false);
@@ -85,6 +83,8 @@ export function Theater3DStageCanvas({
   onWebglFailedRef.current = onWebglFailed;
 
   keyframeRef.current = keyframe;
+  keyframeIndexRef.current = keyframeIndex;
+  progressPctRef.current = progressPct;
   guideModeRef.current = guideMode;
   isPlayingRef.current = isPlaying;
 
@@ -116,7 +116,7 @@ export function Theater3DStageCanvas({
     manualOrbitRef.current = false;
     onManualOrbitChangeRef.current(false);
 
-    const isSoftwareGl = detectSoftwareGl();
+    const isSoftwareGl = isSoftwareWebGLCached();
     const profile = resolveRenderProfile('auto', isSoftwareGl);
 
     let renderer: THREE.WebGLRenderer;
@@ -155,16 +155,21 @@ export function Theater3DStageCanvas({
     scene.background = new THREE.Color(0x04070e);
     scene.fog = new THREE.FogExp2(0x04070e, 0.028);
 
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
-    scene.environment = envRT.texture;
-    pmrem.dispose();
+    const useEnvMap = profile.effectiveTier !== 'low';
+    let envRT: THREE.WebGLRenderTarget | null = null;
+    if (useEnvMap) {
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
+      scene.environment = envRT.texture;
+      pmrem.dispose();
+    }
 
     // Dark Documentary Studio Lighting Rig (ambient smoothly dims in Guide modes to isolate target)
-    const hemi = new THREE.HemisphereLight(0xcbd5e1, 0x050810, 0.42);
+    const darkHemiBoost = useEnvMap ? 0 : 0.28;
+    const hemi = new THREE.HemisphereLight(0xcbd5e1, 0x050810, 0.42 + darkHemiBoost);
     scene.add(hemi);
 
-    const keyLight = new THREE.DirectionalLight(0xfff5e8, 0.88);
+    const keyLight = new THREE.DirectionalLight(0xfff5e8, useEnvMap ? 0.88 : 1.05);
     keyLight.position.set(6.5, 11.0, 6.5);
     if (profile.shadowsEnabled) {
       keyLight.castShadow = true;
@@ -180,7 +185,7 @@ export function Theater3DStageCanvas({
     }
     scene.add(keyLight);
 
-    const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.55);
+    const rimLight = new THREE.DirectionalLight(0x38bdf8, useEnvMap ? 0.55 : 0.72);
     rimLight.position.set(-8.0, 5.5, -7.5);
     scene.add(rimLight);
 
@@ -239,14 +244,60 @@ export function Theater3DStageCanvas({
     } else if (sceneKind === 'electronics-diorama') {
       dioramaBuilt = buildElectronicsDiorama(maxAniso, profile.textureScale);
       scene.add(dioramaBuilt.rootGroup);
+    } else if (sceneKind === 'arch-bus-diorama') {
+      dioramaBuilt = buildStoryArchUnitsScene(maxAniso, profile.textureScale);
+      scene.add(dioramaBuilt.rootGroup);
+    } else if (sceneKind === 'arch-perf-diorama') {
+      dioramaBuilt = buildStoryArchPerfScene(maxAniso, profile.textureScale);
+      scene.add(dioramaBuilt.rootGroup);
+    } else if (sceneKind === 'arch-parallel-diorama') {
+      dioramaBuilt = buildStoryArchParallelScene(maxAniso, profile.textureScale);
+      scene.add(dioramaBuilt.rootGroup);
+    } else if (sceneKind === 'history-mech-diorama') {
+      dioramaBuilt = buildStoryHistoryMechScene(maxAniso, profile.textureScale);
+      scene.add(dioramaBuilt.rootGroup);
+    } else if (sceneKind === 'history-gen5-diorama') {
+      dioramaBuilt = buildStoryHistoryGen5Scene(maxAniso, profile.textureScale);
+      scene.add(dioramaBuilt.rootGroup);
+    } else if (sceneKind === 'history-class-sw-diorama') {
+      dioramaBuilt = buildStoryHistoryClassScene(maxAniso, profile.textureScale);
+      scene.add(dioramaBuilt.rootGroup);
     } else {
       dioramaBuilt = buildMonitorTerminalDiorama(sceneKind, maxAniso, profile.textureScale);
       scene.add(dioramaBuilt.rootGroup);
     }
 
-    // Precision 3D Focus Ring + Leader Pointer Line
+    const isStoryBright = dioramaBuilt?.stageTheme === 'story-bright';
+    const storyAtmo = dioramaBuilt?.initialAtmosphere;
+    const storyHemiTarget = storyAtmo ? storyAtmo.hemiIntensity + (useEnvMap ? 0 : 0.16) : 0.85;
+    if (isStoryBright && storyAtmo) {
+      scene.background = new THREE.Color(storyAtmo.backgroundHex);
+      scene.fog = new THREE.Fog(storyAtmo.fogHex, storyAtmo.fogNear, storyAtmo.fogFar);
+      hemi.color.setHex(storyAtmo.hemiSkyHex);
+      hemi.groundColor.setHex(storyAtmo.hemiGroundHex);
+      hemi.intensity = storyHemiTarget;
+      keyLight.color.setHex(storyAtmo.keyHex);
+      keyLight.intensity = storyAtmo.keyIntensity;
+      keyLight.position.set(8.5, 13.0, 7.5);
+      keyLight.shadow.camera.left = -12;
+      keyLight.shadow.camera.right = 12;
+      keyLight.shadow.camera.top = 12;
+      keyLight.shadow.camera.bottom = -12;
+      keyLight.shadow.normalBias = 0.02;
+      rimLight.color.setHex(storyAtmo.rimHex);
+      rimLight.intensity = storyAtmo.rimIntensity;
+      scene.environmentIntensity = storyAtmo.envIntensity;
+      renderer.toneMappingExposure = 1.06;
+      camera.far = 110;
+      camera.updateProjectionMatrix();
+      controls.maxDistance = 19.5;
+    }
+
+    // Precision 3D Focus Ring + Leader Pointer Line (used on dark hardware scenes; hidden on bright story scenes)
     const focusMarker = createTheaterFocusMarker();
-    scene.add(focusMarker.rootGroup);
+    if (!isStoryBright) {
+      scene.add(focusMarker.rootGroup);
+    }
 
     if (!isSoftwareGl) {
       renderer.compile(scene, camera);
@@ -328,31 +379,60 @@ export function Theater3DStageCanvas({
       controls.update();
       camera.updateMatrixWorld();
 
-      // 2. Surrounding ambient dimming + tightened spotlight when visual guide is ON
+      // 2. Lighting behavior: keep story-bright worlds vivid with gentle warm spotlight; dim dark studio only on hardware scenes
       const lightDamp = 6.5;
-      hemi.intensity = THREE.MathUtils.damp(hemi.intensity, markerActive ? 0.18 : 0.42, lightDamp, dt);
-      keyLight.intensity = THREE.MathUtils.damp(keyLight.intensity, markerActive ? 0.38 : 0.88, lightDamp, dt);
-      rimLight.intensity = THREE.MathUtils.damp(rimLight.intensity, markerActive ? 0.28 : 0.55, lightDamp, dt);
-      scene.environmentIntensity = THREE.MathUtils.damp(
-        scene.environmentIntensity,
-        markerActive ? 0.46 : 1.0,
-        lightDamp,
-        dt
-      );
-      studioSpot.intensity = THREE.MathUtils.damp(
-        studioSpot.intensity,
-        markerActive ? 74 : 42,
-        lightDamp,
-        dt
-      );
-      studioSpot.angle = THREE.MathUtils.damp(
-        studioSpot.angle,
-        markerActive ? Math.PI * 0.145 : Math.PI * 0.2,
-        lightDamp,
-        dt
-      );
+      if (isStoryBright && storyAtmo) {
+        hemi.intensity = THREE.MathUtils.damp(hemi.intensity, storyHemiTarget, lightDamp, dt);
+        keyLight.intensity = THREE.MathUtils.damp(keyLight.intensity, storyAtmo.keyIntensity, lightDamp, dt);
+        rimLight.intensity = THREE.MathUtils.damp(rimLight.intensity, storyAtmo.rimIntensity, lightDamp, dt);
+        scene.environmentIntensity = THREE.MathUtils.damp(
+          scene.environmentIntensity,
+          storyAtmo.envIntensity,
+          lightDamp,
+          dt
+        );
+        studioSpot.intensity = THREE.MathUtils.damp(studioSpot.intensity, markerActive ? 22 : 10, lightDamp, dt);
+        studioSpot.angle = THREE.MathUtils.damp(studioSpot.angle, Math.PI * 0.24, lightDamp, dt);
+      } else {
+        hemi.intensity = THREE.MathUtils.damp(
+          hemi.intensity,
+          (markerActive ? 0.18 : 0.42) + darkHemiBoost,
+          lightDamp,
+          dt
+        );
+        keyLight.intensity = THREE.MathUtils.damp(
+          keyLight.intensity,
+          markerActive ? (useEnvMap ? 0.38 : 0.52) : (useEnvMap ? 0.88 : 1.05),
+          lightDamp,
+          dt
+        );
+        rimLight.intensity = THREE.MathUtils.damp(
+          rimLight.intensity,
+          markerActive ? (useEnvMap ? 0.28 : 0.4) : (useEnvMap ? 0.55 : 0.72),
+          lightDamp,
+          dt
+        );
+        scene.environmentIntensity = THREE.MathUtils.damp(
+          scene.environmentIntensity,
+          markerActive ? 0.46 : 1.0,
+          lightDamp,
+          dt
+        );
+        studioSpot.intensity = THREE.MathUtils.damp(
+          studioSpot.intensity,
+          markerActive ? 74 : 42,
+          lightDamp,
+          dt
+        );
+        studioSpot.angle = THREE.MathUtils.damp(
+          studioSpot.angle,
+          markerActive ? Math.PI * 0.145 : Math.PI * 0.2,
+          lightDamp,
+          dt
+        );
+      }
 
-      // 3. Smoothly glide dramatic overhead studio spotlight onto the active component
+      // 3. Smoothly glide warm overhead spotlight onto the active actor/component
       _spotTargetPos.set(kf.anchor3D[0], kf.anchor3D[1], kf.anchor3D[2]);
       spotTarget.position.x = THREE.MathUtils.damp(spotTarget.position.x, _spotTargetPos.x, 6, dt);
       spotTarget.position.y = THREE.MathUtils.damp(spotTarget.position.y, _spotTargetPos.y, 6, dt);
@@ -372,11 +452,15 @@ export function Theater3DStageCanvas({
         dt
       );
 
-      _domainColor.set(kf.domainColor);
-      _spotColor.set('#FFF8EF').lerp(_domainColor, markerActive ? 0.22 : 0.14);
+      if (isStoryBright) {
+        _spotColor.set('#FFE8B6');
+      } else {
+        _domainColor.set(kf.domainColor);
+        _spotColor.set('#FFF8EF').lerp(_domainColor, markerActive ? 0.22 : 0.14);
+      }
       studioSpot.color.lerp(_spotColor, Math.min(1, dt * 6));
 
-      // 4. Scene-specific mechanical animations & active sheen
+      // 4. Scene-specific mechanical & story animations
       if (studioMobo) {
         studioMobo.update(
           elapsed,
@@ -388,7 +472,12 @@ export function Theater3DStageCanvas({
           reducedMotion
         );
       } else if (dioramaBuilt) {
-        dioramaBuilt.update(elapsed, dt, kf.mechAction, kf.anchor3D, kf.domainColor, playing);
+        dioramaBuilt.update(elapsed, dt, kf.mechAction, kf.anchor3D, kf.domainColor, playing, {
+          progressPct: progressPctRef.current,
+          keyframeId: kf.id,
+          keyframeIndex: keyframeIndexRef.current,
+          reducedMotion,
+        });
       }
 
       // 5. Resolve focus ring radius (cached per keyframe ID to avoid per-frame Box3 traversal)
@@ -412,7 +501,7 @@ export function Theater3DStageCanvas({
       const markerState = focusMarker.update({
         elapsed,
         dt,
-        visible: markerActive,
+        visible: !isStoryBright && markerActive,
         anchor: kf.anchor3D,
         radius: resolvedRadius,
         plane: kf.focusPlane ?? 'xz',
@@ -424,10 +513,30 @@ export function Theater3DStageCanvas({
 
       renderer.render(scene, camera);
 
-      // 6. Project 3D pointer tip directly onto floating DOM tag (zero React state re-renders!)
+      // 6. Project 3D pointer tip (or top-of-anchor on bright story scenes) onto slim HUD tag
       const tagEl = tagElRef.current;
       if (tagEl) {
-        if (!markerState.visible || markerState.opacity < 0.03) {
+        if (isStoryBright) {
+          if (!markerActive) {
+            tagEl.style.opacity = '0';
+          } else {
+            _tipWorld.set(kf.anchor3D[0], kf.anchor3D[1] + 1.55, kf.anchor3D[2]);
+            _tipWorld.project(camera);
+            const inFront = _tipWorld.z >= -1 && _tipWorld.z <= 1;
+            if (!inFront) {
+              tagEl.style.opacity = '0';
+            } else {
+              const rawX = (_tipWorld.x * 0.5 + 0.5) * viewportW;
+              const rawY = (-_tipWorld.y * 0.5 + 0.5) * viewportH;
+              const tagW = tagEl.offsetWidth || 168;
+              const tagH = tagEl.offsetHeight || 28;
+              const clampedX = Math.max(12, Math.min(viewportW - tagW - 12, rawX - tagW * 0.5));
+              const clampedY = Math.max(12, Math.min(viewportH * 0.34, rawY - tagH));
+              tagEl.style.transform = `translate3d(${clampedX.toFixed(1)}px, ${clampedY.toFixed(1)}px, 0)`;
+              tagEl.style.opacity = '0.96';
+            }
+          }
+        } else if (!markerState.visible || markerState.opacity < 0.03) {
           tagEl.style.opacity = '0';
         } else {
           focusMarker.getTipWorldPosition(_tipWorld);
@@ -440,7 +549,6 @@ export function Theater3DStageCanvas({
             const rawY = (-_tipWorld.y * 0.5 + 0.5) * viewportH;
             const tagW = tagEl.offsetWidth || 156;
             const tagH = tagEl.offsetHeight || 28;
-            // Anchor tag slightly right of pointer tip; clamp cleanly inside stage safe bounds
             const clampedX = Math.max(12, Math.min(viewportW - tagW - 12, rawX + 6));
             const clampedY = Math.max(12, Math.min(viewportH - tagH - 18, rawY - tagH * 0.5));
             tagEl.style.transform = `translate3d(${clampedX.toFixed(1)}px, ${clampedY.toFixed(1)}px, 0)`;
@@ -524,7 +632,7 @@ export function Theater3DStageCanvas({
       focusMarker.dispose();
       studioMobo?.dispose();
       dioramaBuilt?.dispose();
-      envRT.dispose();
+      envRT?.dispose();
       renderer.dispose();
       if (renderer.domElement.parentNode === host) {
         host.removeChild(renderer.domElement);

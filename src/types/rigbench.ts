@@ -13,6 +13,10 @@ export interface ToastMessage {
   variant: ToastVariant;
 }
 
+export type MaterialTrackId = 'praktikum' | 'arsitektur' | 'sejarah';
+
+export type TryOutScope = 'all' | 'praktikum' | 'arsitektur' | 'sejarah' | 'theory';
+
 export type ClusterId =
   | 'cluster-1'
   | 'cluster-2'
@@ -20,7 +24,13 @@ export type ClusterId =
   | 'cluster-4'
   | 'cluster-5'
   | 'cluster-6'
-  | 'cluster-7';
+  | 'cluster-7'
+  | 'arch-1'
+  | 'arch-2'
+  | 'arch-3'
+  | 'hist-1'
+  | 'hist-2'
+  | 'hist-3';
 
 export type TheaterVisualType =
   | 'ipo-cycle'
@@ -35,7 +45,19 @@ export type TheaterVisualType =
   | 'troubleshooting-matrix'
   | 'electronics-bench'
   | 'eula-legal-shield'
-  | 'crack-threat-vector';
+  | 'crack-threat-vector'
+  | 'arch-units-overview'
+  | 'arch-bus-buffer'
+  | 'arch-os-multi'
+  | 'arch-perf-math'
+  | 'arch-perf-pipe'
+  | 'arch-risc-spec'
+  | 'arch-parallel'
+  | 'hist-pre-electronic'
+  | 'hist-gen-12'
+  | 'hist-gen-345'
+  | 'hist-class-def'
+  | 'hist-sw-eras';
 
 export interface LectureSegment {
   id: string;
@@ -50,6 +72,7 @@ export interface LectureSegment {
 
 export interface CurriculumCluster {
   id: ClusterId;
+  track?: MaterialTrackId;
   number: string;
   shortTitle: string;
   title: string;
@@ -235,6 +258,8 @@ export interface ExamAttemptSummary {
   completedAtIso: string;
   durationMinutes: number;
   elapsedSeconds: number;
+  scope?: TryOutScope;
+  scopeLabel?: string;
   totalScore: number; // 0..100 weighted (Essay 70% + ABC 30%)
   essayScorePercent: number;
   abcScorePercent: number;
@@ -252,7 +277,9 @@ export interface GlossaryItem {
     | 'Memori & Storage'
     | 'Kelistrikan'
     | 'Partisi & File System'
-    | 'EULA & Keamanan Siber';
+    | 'EULA & Keamanan Siber'
+    | 'Arsitektur & Performa'
+    | 'Sejarah & Klasifikasi';
   definition: string;
   examTrap?: string;
 }

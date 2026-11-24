@@ -29,6 +29,12 @@ const VALID_CLUSTER_IDS = new Set<ClusterId>([
   'cluster-5',
   'cluster-6',
   'cluster-7',
+  'arch-1',
+  'arch-2',
+  'arch-3',
+  'hist-1',
+  'hist-2',
+  'hist-3',
 ]);
 
 function safeStringArray(input: unknown, maxItems: number, maxLen = 64): string[] {
@@ -86,7 +92,7 @@ function readStorage(): UserProgressStore {
 
     if (!parsed || typeof parsed !== 'object') return DEFAULT_PROGRESS;
 
-    const completedClusters = safeStringArray(parsed.completedClusters, 10, 24).filter(
+    const completedClusters = safeStringArray(parsed.completedClusters, 20, 24).filter(
       (id): id is ClusterId => VALID_CLUSTER_IDS.has(id as ClusterId)
     );
 
@@ -104,7 +110,7 @@ function readStorage(): UserProgressStore {
       assemblyCompleted: Boolean(parsed.assemblyCompleted),
       osSimCompleted: Boolean(parsed.osSimCompleted),
       diskSimCompleted: Boolean(parsed.diskSimCompleted),
-      masteredGlossaryIds: safeStringArray(parsed.masteredGlossaryIds, 60, 48),
+      masteredGlossaryIds: safeStringArray(parsed.masteredGlossaryIds, 100, 48),
       examHistory,
       assemblyHistory,
       liveBgMode: parsed.liveBgMode === 'cozy-desk' ? 'cozy-desk' : 'pcb-flow',

@@ -1,8 +1,14 @@
 import { useMemo, useState } from 'react';
 import { CheckCircle, XCircle } from '@phosphor-icons/react';
-import { CURRICULUM_CLUSTERS } from '../../../data/curriculumData';
+import { CURRICULUM_CLUSTERS, getClusterTrack } from '../../../data/curriculumData';
+import { MATERIAL_TRACKS } from '../../../data/extraCurriculumData';
 import { ABC_QUESTIONS, ESSAY_QUESTIONS } from '../../../data/examBankData';
-import type { ClusterId, EssayEvaluationResult, ToastVariant } from '../../../types/rigbench';
+import type {
+  ClusterId,
+  EssayEvaluationResult,
+  MaterialTrackId,
+  ToastVariant,
+} from '../../../types/rigbench';
 import { evaluateEssayAnswer } from '../../../utils/rubricMatcher';
 import { MAX_ESSAY_CHARS, sanitizeUserText } from '../../../utils/inputSanitizer';
 
@@ -16,6 +22,17 @@ export function GuidedPracticePanel({ onNotify }: GuidedPracticePanelProps) {
   const [results, setResults] = useState<Record<string, EssayEvaluationResult>>({});
   const [idealVisible, setIdealVisible] = useState<Record<string, boolean>>({});
   const [abcChoices, setAbcChoices] = useState<Record<string, 'A' | 'B' | 'C' | 'D'>>({});
+
+  const activeTrack: MaterialTrackId = getClusterTrack(clusterId);
+  const trackClusters = useMemo(
+    () => CURRICULUM_CLUSTERS.filter((c) => getClusterTrack(c.id) === activeTrack),
+    [activeTrack]
+  );
+
+  const handleSelectTrack = (trackId: MaterialTrackId) => {
+    const first = CURRICULUM_CLUSTERS.find((c) => getClusterTrack(c.id) === trackId);
+    if (first) setClusterId(first.id);
+  };
 
   const essays = useMemo(
     () => ESSAY_QUESTIONS.filter((q) => q.clusterId === clusterId),
@@ -44,9 +61,36 @@ export function GuidedPracticePanel({ onNotify }: GuidedPracticePanelProps) {
 
   return (
     <div className="space-y-6">
-      {/* Compact 7-Cluster Filter Bar */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-        {CURRICULUM_CLUSTERS.map((cluster) => {
+      {/* 3 Sub-Tab Track Selector */}
+      <div className="inline-flex flex-wrap gap-1 rounded-xl bg-[#070E1F] p-1 border border-[#3B82F6]/20">
+        {MATERIAL_TRACKS.map((track) => {
+          const selected = track.id === activeTrack;
+          return (
+            <button
+              key={track.id}
+              type="button"
+              onClick={() => handleSelectTrack(track.id)}
+              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors press-feedback ${
+                selected
+                  ? 'bg-[#2563EB] text-white'
+                  : 'text-[#94A3B8] hover:text-[#F8FAFC]'
+              }`}
+            >
+              {track.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Dynamic Cluster Filter Bar for Active Track */}
+      <div
+        className={`grid gap-2 ${
+          trackClusters.length >= 6
+            ? 'grid-cols-2 sm:grid-cols-4 lg:grid-cols-7'
+            : 'grid-cols-1 sm:grid-cols-3'
+        }`}
+      >
+        {trackClusters.map((cluster) => {
           const active = cluster.id === clusterId;
           return (
             <button

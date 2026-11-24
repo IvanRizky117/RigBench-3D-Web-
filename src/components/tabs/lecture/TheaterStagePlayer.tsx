@@ -127,9 +127,14 @@ export function TheaterStagePlayer({
   const resolvedDirector = useMemo(
     () =>
       segment
-        ? resolveSegmentKeyframes(segment.visualType, segment.narration, speech.wavPausePcts)
+        ? resolveSegmentKeyframes(
+            segment.visualType,
+            segment.narration,
+            speech.wavPausePcts,
+            speech.wavAudioProfile
+          )
         : null,
-    [segment, speech.wavPausePcts]
+    [segment, speech.wavPausePcts, speech.wavAudioProfile]
   );
 
   // Lock subtitles + 3D camera + focus marker + info card to genuine WAV silence boundaries
@@ -439,6 +444,8 @@ export function TheaterStagePlayer({
               <Theater3DStageCanvas
                 sceneKind={plan.sceneKind}
                 keyframe={keyframe}
+                keyframeIndex={activeKeyframeIdx}
+                progressPct={speech.progress}
                 guideMode={guideMode}
                 isPlaying={speech.isPlaying}
                 resyncSignal={resyncSignal}
@@ -502,28 +509,34 @@ export function TheaterStagePlayer({
               </div>
             )}
 
-            {/* Fullscreen Plain Borderless Subtitle (clears fullscreen bottom-right card cleanly) */}
+            {/* Fullscreen Subtitle with Safe Bottom Space & Measured Contrast Scrim (Never Clipped) */}
             {isFullscreen && ccEnabled && activeCue && (
-              <div
-                aria-live="polite"
-                className={`pointer-events-none absolute inset-x-4 z-10 text-center transition-all duration-300 ${
-                  controlsVisible ? 'bottom-32 sm:bottom-28' : 'bottom-7'
-                } ${showInfoCard ? 'md:pr-[324px] md:text-left md:pl-8' : ''}`}
-              >
-                <p
-                  className={`max-w-3xl text-base font-medium leading-snug tracking-wide text-[#F8FAFC] cinema-subtitle-text sm:text-xl md:text-2xl ${
-                    showInfoCard ? '' : 'mx-auto'
-                  }`}
+              <>
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 bottom-0 z-[9] h-48 bg-gradient-to-t from-[#02050C]/90 via-[#02050C]/55 to-transparent"
+                />
+                <div
+                  aria-live="polite"
+                  className={`pointer-events-none absolute inset-x-4 z-10 text-center transition-all duration-300 ${
+                    controlsVisible ? 'bottom-36 sm:bottom-32' : 'bottom-10 sm:bottom-12'
+                  } ${showInfoCard ? 'md:pr-[324px] md:text-left md:pl-8' : ''}`}
                 >
-                  {renderSyncedLine(
-                    activeCue.words,
-                    activeCue.startWordIndex,
-                    syncedWordIndex,
-                    segment.highlightedKeywords,
-                    speech.isPlaying
-                  )}
-                </p>
-              </div>
+                  <p
+                    className={`max-w-3xl text-base font-medium leading-relaxed tracking-wide text-[#F8FAFC] cinema-subtitle-text sm:text-xl md:text-2xl ${
+                      showInfoCard ? '' : 'mx-auto'
+                    }`}
+                  >
+                    {renderSyncedLine(
+                      activeCue.words,
+                      activeCue.startWordIndex,
+                      syncedWordIndex,
+                      segment.highlightedKeywords,
+                      speech.isPlaying
+                    )}
+                  </p>
+                </div>
+              </>
             )}
           </div>
 
@@ -540,13 +553,13 @@ export function TheaterStagePlayer({
           )}
         </div>
 
-        {/* Normal Mode: Plain Borderless Subtitle Directly Below Frameless 3D Stage */}
+        {/* Normal Mode: Spacious Unclipped Subtitle Region Directly Below 3D Stage */}
         {!isFullscreen && ccEnabled && activeCue && (
           <div
             aria-live="polite"
-            className="flex min-h-[44px] items-center justify-center border-t border-white/[0.04] bg-[#04070E] px-4 py-2 text-center"
+            className="flex min-h-[68px] items-center justify-center border-t border-white/[0.06] bg-[#04070E] px-5 pt-2.5 pb-4 text-center"
           >
-            <p className="max-w-4xl text-[13px] sm:text-[15px] leading-snug tracking-wide">
+            <p className="max-w-4xl text-[13.5px] sm:text-[15.5px] leading-relaxed tracking-wide">
               {renderSyncedLine(
                 activeCue.words,
                 activeCue.startWordIndex,

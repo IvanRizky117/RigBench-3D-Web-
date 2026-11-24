@@ -1,6 +1,6 @@
 # RigBench — Interactive PC Architecture & HW-SW Practicum Lab
 
-**RigBench** adalah aplikasi web edukasi dan laboratorium praktikum arsitektur komputer (*Hardware–Software*) berbasis **STMIK AKI**. Aplikasi ini dirancang untuk berjalan **100% di sisi klien (*client-side*)** dengan penyimpanan progres otomatis di `localStorage`, kemampuan **PWA offline-ready**, serta **tanpa ketergantungan backend, database eksternal, ataupun panggilan API AI eksternal**.
+**RigBench** adalah aplikasi web edukasi dan laboratorium praktikum interaktif arsitektur komputer (*Hardware–Software*), anatomi PC, serta sejarah komputer berbasis **STMIK AKI & D3 TKJ**. Aplikasi ini dirancang *offline-first* (progres disimpan di `localStorage`, audio TTS dicache di IndexedDB, dukungan PWA), dilengkapi panggung Teater 3D Three.js yang dioptimalkan hingga HP kelas entri (seperti Infinix Smart 6), serta **backend Gemini TTS opsional sisi server** (`server.ts` lokal dan **Netlify Functions** `/api/tts/*`) dengan fallback otomatis ke suara lokal browser (*Web Speech API*).
 
 ---
 
@@ -11,45 +11,63 @@
 - **Bento Progress & Readiness Gauge:** Menghitung indeks kesiapan belajar berdasarkan klaster materi yang diselesaikan, jumlah komponen 3D yang diinspeksi, dan skor Try Out terbaik di perangkat pengguna.
 - **Switcher Siklus Kerja & Utilitas:** Simulasi interaktif alur `Input → Process → Output → Storage`, ringkasan kelistrikan PSU vs rubrik penilaian, serta tombol instalasi aplikasi sebagai PWA (`PWAInstallButton`).
 
-### 2. Teater Materi 7 Klaster & Lab Elektronika (`LectureTab`)
-- **7 Klaster Kurikulum (12 Segmen Narasi Terstruktur):**
-  - **Klaster 01 — Mainboard & Chipset:** Siklus dasar komputer, anatomi 24 titik mainboard, Northbridge (MCH) vs Southbridge (ICH), serta peta 9 port Back Panel I/O (`#16–#24`).
-  - **Klaster 02 — Memori & Processor:** ROM (BIOS, *non-volatile*) vs RAM (*volatile*), perbandingan modul SIMM/DIMM/SODIMM, celah *notch* SDRAM–DDR3, serta lini masa Intel vs AMD (1985–2011).
-  - **Klaster 03 — PSU & Pinout ATX:** *Grounding* AC-IN, proteksi EMI, Stand-by (`+5VSB`) vs Main Power Supply, Stavolt vs UPS, dan simulator jumper pin PSU ATX 24-pin (Pin 16 Hijau `PS_ON` + Ground).
-  - **Klaster 04 — Storage, MBR & GPT:** Media penyimpanan HDD/SSD, antarmuka SATA/IDE, serta perbandingan partisi MBR dan GPT.
-  - **Klaster 05 — Instalasi OS & Troubleshoot:** Tahapan instalasi sistem operasi serta studi kasus troubleshooting hardware (blank screen, MaTot, bunyi beep, dsb.).
-  - **Klaster 06 — Elektronika & Multitester:** Pengenalan komponen semikonduktor, kalkulator kode warna resistor (4/5/6 gelang), dan dekoder nilai kapasitor keramik.
-  - **Klaster 07 — EULA, Crack & Siber:** Inspektor klausul EULA, etika lisensi perangkat lunak, risiko *software cracking*, dan keamanan siber dasar.
-- **Theater Stage Player & Sinkronisasi Suara Lokal:** Menggunakan **Web Speech API (`speechSynthesis`)** browser dengan antrean per-baris (`onstart`/`onend`), kalibrasi kecepatan baca (CPS) adaptif, diagram SVG dinamis per segmen, dan transkrip interaktif.
+### 2. Teater Materi 13 Klaster / 3 Jalur & Lab Elektronika (`LectureTab`)
+Tersedia **3 jalur kurikulum terstruktur (13 Klaster, 24 Segmen Narasi 3D)**:
+- **Jalur 1 — Praktikum PC (`Modul STMIK AKI`, 7 Klaster · 12 Segmen):**
+  - **Klaster 01 — Mainboard & Chipset:** Siklus `Input–Process–Output–Storage`, tur 15 titik papan induk (`#01–#15`), Northbridge (MCH) vs Southbridge (ICH), serta pemetaan 9 port Back Panel I/O (`#16–#24`).
+  - **Klaster 02 — Memori & Processor:** ROM (BIOS, *non-volatile*) vs RAM (*volatile*), perbandingan modul SIMM/DIMM/SODIMM, celah *notch* SDRAM–DDR3, serta evolusi Intel vs AMD (1985–2011).
+  - **Klaster 03 — PSU & Pinout ATX:** *Grounding* AC-IN, proteksi EMI, Stand-by (`+5VSB`) vs Main Power Supply, Stavolt vs UPS, dan simulator jumper pin PSU ATX 24-pin.
+  - **Klaster 04 — Storage, MBR & GPT:** Anatomi HDD 3.5", antarmuka PATA/IDE vs SATA/SCSI, serta perbandingan partisi MBR vs GPT.
+  - **Klaster 05 — Instalasi OS & Troubleshoot:** Tahapan prosedural instalasi Windows serta bedah 6 kasus troubleshooting (*MaTot, Blank, Hang, Restart, Lambat, Virus*).
+  - **Klaster 06 — Elektronika & Multitester:** Komponen semikonduktor, kalkulator gelang warna resistor (4/5/6 gelang), dan dekoder kapasitor keramik.
+  - **Klaster 07 — EULA, Crack & Siber:** Inspektor klausul EULA, anatomi *Patch/Keygen/Loader/No-Disc*, dan 4 pilar bahaya aplikasi bajakan.
+- **Jalur 2 — Arsitektur Komputer (`Modul 1 · D3 TKJ`, 3 Klaster · 7 Segmen):**
+  - **A1:** 5 tipe komputer (*PC → Supercomputer*), 5 unit fungsional (*Input, Memori & Cache, ALU+Register, Output, Unit Kontrol*), struktur *Single/Multi-Bus*, dan *Register Buffer I/O*.
+  - **A2:** Compiler & *Multiprogramming OS* (`t0–t5`), rumus performa `T = (N × S) / R`, *Pipelining* & *Superscalar*, serta arsitektur kurir *RISC vs CISC* dan tolok ukur *SPEC*.
+  - **A3:** Pemrosesan paralel *Shared-Memory Multiprocessor*, *Distributed-Memory Multicomputer*, dan *Array Processor SIMD*.
+- **Jalur 3 — Sejarah PC (`Modul 6 · D3 TKJ`, 3 Klaster · 5 Segmen):**
+  - **S1:** 5 zona alat hitung awal (*Batu/Jari, Abacus, Pascaline 1642 & Colmar, Mesin Babbage & Hollerith, Mark I & Atanasoff-Berry*).
+  - **S2:** 5 generasi hardware komputer (*Gen 1 Tabung Vakum ENIAC/EDVAC 160 kW, Gen 2 Transistor IBM 1401, Gen 3 IC Jack Kilby & OS Multi-Program, Gen 4 Mikroprosesor Intel 4004 & IBM PC/Mac GUI, Gen 5 Kubah AI & Superkonduktor*).
+  - **S3:** Definisi pakar (*Blissmer, Sanders, Hamacher*), analogi mobil 3 elemen (*Hardware–Software–Brainware*), Jam Analog vs Angka Digital vs Mesin Fax Hybrid, 6 bentuk fisik (*Tower → Palmtop*), dan 4 tangga Era Software (*Pioner, Stabil, Mikro, Modern*).
+
+- **Theater 3D Audio & Sinkronisasi Subtitle:**
+  - **Hybrid Gemini TTS (`gemini-3.8-flash-lite-tts`):** Dihasilkan aman lewat rute `/api/tts/:segmentId/:personaId` (Express `server.ts` atau Netlify Function `netlify/functions/tts.mts`) dan di-cache di sisi klien memakai **IndexedDB** (`rigbench-tts-cache`) serta cache LRU memori terbatas.
+  - **Deteksi Jeda WAV Tanpa Overhead:** `waveformSync.ts` membedah buffer WAV PCM16 langsung di memori untuk mengunci jeda antar-kalimat dan antar-klausa (`subtitleCues.ts`) sehingga sorotan kata dan subtitle tetap akurat pada kecepatan `0.75x`, `0.9x`, `1x`, `1.25x`, dan `1.5x`.
+  - **Fallback Lokal Aman:** Jika `GEMINI_API_KEY` belum diisi di server atau perangkat sedang offline, sistem otomatis memakai suara lokal **Web Speech API** (dan tetap menyimpan audio Gemini jika browser memblokir *autoplay* awal sampai pengguna mengetuk tombol Putar).
 
 ### 3. Lab 3D Motherboard PBR & Simulator Rakit PC (`Lab3DTab`)
-- **Mode Inspeksi (25 Titik Komponen):** Menjelajahi 24 titik utama motherboard (`#01–#24`) ditambah blok konektor panel depan (`C-Panel / F_PANEL`) pada model 3D PBR prosedural Three.js, lengkap dengan kontrol kamera orbit maupun navigasi bebas `WASD`.
-- **Kartu Inspeksi Responsif & Audio Penjelasan:** Menampilkan fungsi standar, poin teknis, dan *jebakan soal* (`InspectPopupCard`). Pada layar mobile (`< 640px`), kartu tampil sebagai *Compact Bottom Sheet* (`max-h-[36dvh]`) dengan tombol ekspansi `Detail`/`Ringkas` agar objek motherboard 3D tetap terlihat leluasa.
-- **Mode Rakit PC 3D (22 Langkah Terstruktur):** Simulasi *drag-and-drop* komponen 3D magnetis (`STRICT_ASSEMBLY_ITEMS`), validasi arah/rotasi komponen (tombol `R`), pengaturan jumper HDD (`Master` / `Slave` / `Cable Select`), pengkabelan 5 jalur `F_PANEL` (`HDD LED`, `+P LED`, `-P LED`, `RESET SW`, `POWER SW`), laporan hasil rakit (`AssemblyPostReportModal`), dan dukungan opsional muat model `.glb`/`.gltf` lokal (maksimal 25 MB).
+- **Mode Inspeksi (25 Titik Komponen):** Menjelajahi 24 titik utama motherboard (`#01–#24`) ditambah blok konektor panel depan (`C-Panel / F_PANEL`) pada model 3D PBR Three.js, lengkap dengan kontrol kamera orbit maupun navigasi `WASD`.
+- **Mode Rakit PC 3D (22 Langkah Terstruktur):** Simulasi rakit komponen 3D magnetis, validasi arah/rotasi (`R`), jumper HDD (`Master` / `Slave` / `CS`), pengkabelan 5 jalur `F_PANEL`, laporan hasil rakit, dan muat model `.glb`/`.gltf` lokal (maks 25 MB).
 
 ### 4. Uji Pemahaman, Try Out & Glosarium (`ExamTab`)
-- **Try Out Berwaktu (70% Essay : 30% Pilihan Ganda):** Berisi **14 soal Essay Analisis** dan **15 soal Pilihan Ganda (ABC)** dengan pengatur waktu hitung mundur (`useExamTimer`), penanda ragu-ragu (*flag*), dan kisi navigasi nomor soal.
-- **Smart Local Rubric Analyzer (`rubricMatcher.ts`):** Mesin koreksi essay deterministik yang berjalan lokal di browser menggunakan pencocokan kata kunci konsep, peta sinonim istilah hardware, *stemming* Bahasa Indonesia, toleransi typo ringan (*Levenshtein distance ≤ 1*), serta *anti-spam guard*.
-- **Latihan Terpandu & Glosarium Interaktif:** Mode latihan per klaster dengan umpan balik langsung (`GuidedPracticePanel`) dan **27 kartu glosarium interaktif** (`GlossaryFlashcards`) dengan pencarian instan.
-
-### 5. Modul Simulator Tambahan (`OsDiskTab`)
-- Komponen simulasi instalasi sistem operasi dan manajemen partisi disk (`EFI`, `C: NTFS`, `Recovery`, *shrink/format* partisi) tetap tersedia di `src/components/tabs/OsDiskTab.tsx` (saat ini disembunyikan dari bilah navigasi 4 tab utama).
+- **Try Out Berwaktu (70% Essay : 30% Pilihan Ganda):** Berisi **14 soal Essay Analisis** dan **15 soal Pilihan Ganda (ABC)** dengan pengatur waktu (`useExamTimer`), penanda ragu-ragu, dan koreksi essay deterministik lokal (`rubricMatcher.ts`).
+- **Latihan Terpandu & Glosarium:** Latihan per klaster dengan umpan balik langsung dan **27 kartu glosarium interaktif**.
 
 ---
 
-## Tech Stack & Framework
+## Optimasi Perangkat Kelas Entri (Infinix Smart 6 / GPU `low` Tier)
+
+Agar berjalan lancar pada ponsel RAM 2–3 GB dan GPU kelas entri seperti **PowerVR GE8320 / Mali-G51 / Adreno 5xx** (`src/utils/deviceTier.ts`):
+- **Single-Probe GPU & Software GL Cache:** Deteksi WebGL dilakukan satu kali per sesi (`isSoftwareWebGLCached()`), menghindari pembukaan konteks WebGL ganda saat berpindah diorama.
+- **Penurunan Resolusi Tekstur Kanvas Otomatis:** `DioramaResourceTracker` otomatis melakukan *downscale* tekstur papan edukasi/label statis (`textureScale = 0.5`, hemat ~75% VRAM) dan memperlambat frekuensi gambar ulang layar dinamis 3D di tier `low`.
+- **Skip PMREM & Penguncian DPR/FPS:** Di tier `low`, kanvas Teater & Mini Motherboard melewati `PMREMGenerator RoomEnvironment`, mengunci `maxDpr = 1`, `antialias = false`, `precision = 'mediump'`, `shadowsEnabled = false`, dan target `30 FPS`, serta mengaktifkan kelas `.gpu-low-tier` untuk mengganti `backdrop-filter` berat dengan latar solid kontras tinggi.
+- **Batas Cache Audio Memori (LRU):** `ttsAudioCache.ts` menjaga maksimal **3 klip WAV** di RAM browser sementara arsip penuh tersimpan di IndexedDB.
+
+---
+
+## Tech Stack & Arsitektur
 
 | Kategori | Teknologi / Paket | Versi (`package.json`) | Peran Utama |
 | :--- | :--- | :---: | :--- |
-| **UI Framework** | React | `^19.0.1` | Arsitektur komponen SPA berbasis hooks & lazy-loaded tabs |
-| **Bahasa** | TypeScript | `^7.0.2` | Pengetikan statis ketat di seluruh data, hook, dan komponen |
-| **Build Tool** | Vite (`@vitejs/plugin-react`) | `^8.3.0` | Bundler modul ES, code-splitting vendor, dan dev server |
-| **Styling** | Tailwind CSS (`@tailwindcss/vite`) | `^4.3.3` | Utility-first styling dengan tema Dark Sapphire & `.liquid-glass` |
-| **3D Engine** | Three.js (`@types/three`) | `^0.187.0` | Rendering motherboard PBR 3D, partikel/pencahayaan, & GLB loader |
-| **Animasi** | Framer Motion | `^14.14.0` | Transisi halaman, scroll choreography, dan micro-interactions |
-| **Ikonografi** | Phosphor Icons (`@phosphor-icons/react`) | `^2.1.10` | Set ikon konsisten di navbar, dok mobile, dan kartu modul |
-| **PWA / Offline** | `vite-plugin-pwa` (Workbox) | `^2.0.0` | Manifest aplikasi, precache aset statis, dan indikator offline |
-| **Audio & Suara** | Web Speech API & Web Audio API | Native Browser | Narasi materi TTS lokal & efek suara mekanis lab rakit 3D |
+| **UI Framework** | React | `^19.0.1` | SPA berbasis hooks & lazy-loaded tabs |
+| **Bahasa** | TypeScript | `^7.0.2` | Pengetikan statis ketat klien, server, & serverless function |
+| **Backend Lokal** | Express (`tsx` / Node 22) | `^5.3.0` | Proxy `/api/tts/*`, cache WAV `.tts-cache/`, & Vite dev middleware |
+| **Serverless Deploy** | Netlify Functions v2 (`esbuild`) | Node `22` | Endpoint `/api/tts/*` otomatis di Netlify via `netlify/functions/tts.mts` |
+| **Gemini TTS SDK** | `@google/genai` | `^3.6.1` | Sintesis audio narasi model `gemini-3.8-flash-lite-tts` sisi server |
+| **Build Tool** | Vite (`@vitejs/plugin-react`) | `^8.3.0` | Bundler ES module, chunk splitting Three.js/Motion/Icons |
+| **Styling** | Tailwind CSS (`@tailwindcss/vite`) | `^4.3.3` | Dark Sapphire UI, tema teater cerah, & mode hemat `.gpu-low-tier` |
+| **3D Engine** | Three.js (`@types/three`) | `^0.187.0` | Rendering PBR motherboard, diorama teater 3D, & GLB loader |
+| **PWA / Offline** | `vite-plugin-pwa` (Workbox) | `^2.0.0` | Manifest, precache aset statis, & `navigateFallbackDenylist` `/api/*` |
 
 ---
 
@@ -58,91 +76,72 @@
 ```text
 .
 ├── .github/workflows/
-│   └── gitleaks.yml              # CI GitHub Actions untuk pemindaian secret otomatis
+│   └── gitleaks.yml              # CI GitHub Actions pemindai kebocoran secret otomatis
+├── netlify/functions/
+│   └── tts.mts                   # Netlify Functions v2 handler untuk /api/tts/*
 ├── public/                       # Ikon PWA, favicon SVG, & aset statis publik
 ├── src/
 │   ├── components/
-│   │   ├── 3d/                   # Engine 3D Three.js (motherboard builder, kamera, GLB loader)
-│   │   ├── tabs/
-│   │   │   ├── exam/             # Panel hasil Try Out & latihan terpandu per klaster
-│   │   │   ├── home/             # Bento grid, feature sections, & lazy mini motherboard
-│   │   │   ├── lab3d/            # Bottom dock rakit, kartu inspeksi, artwork, & laporan POST
-│   │   │   ├── lecture/          # Theater player, diagram SVG, backdrop, transkrip, & lab klaster
-│   │   │   ├── ExamTab.tsx       # Tab Uji Pemahaman (Try Out, Latihan, Glosarium)
-│   │   │   ├── HomeTab.tsx       # Tab Beranda
-│   │   │   ├── Lab3DTab.tsx      # Tab Lab 3D Inspeksi & Rakit PC
-│   │   │   ├── LectureTab.tsx    # Tab Teater Materi 7 Klaster
-│   │   │   └── OsDiskTab.tsx     # Tab simulasi OS & Disk Management (tersimpan internal)
-│   │   └── ui/                   # Komponen UI bersama (PillNav, MobileBottomDock, Toast, PWA)
-│   ├── data/
-│   │   ├── assemblyGameData.ts   # 22 langkah rakit PC ketat & peta kabel F_PANEL
-│   │   ├── curriculumData.ts     # 7 klaster materi, 12 segmen narasi, CPU/RAM/ATX/EULA data
-│   │   ├── examBankData.ts       # 14 soal Essay, 15 soal ABC, & 27 entri Glosarium
-│   │   └── mainboardData.ts      # 25 titik inspeksi mainboard (#01–#24 + C-Panel)
-│   ├── hooks/                    # State progres localStorage, timer ujian, PWA, & speech sync
-│   ├── types/rigbench.ts         # Definisi tipe TypeScript utama aplikasi
-│   ├── utils/                    # Rubric matcher, sanitasi input, kalkulator, SFX, & subtitle
-│   ├── App.tsx                   # Shell navigasi utama & lazy-loading antar tab
-│   ├── index.css                 # Gaya global Tailwind v4 & token desain RigBench
-│   └── main.tsx                  # Entry point React
-├── .env.example                  # Contoh placeholder variabel lingkungan (tanpa secret)
-├── .gitleaks.toml                # Aturan & allowlist URL publik aman untuk Gitleaks
-├── .gitignore                    # Pengecualian node_modules, dist, dev-dist, .env*, & aset chat
-├── AEGIS_AUDIT_REPORT.md         # Laporan audit keamanan OWASP Top 10:2025
-├── index.html                    # Entry HTML & metadata SEO/PWA
-├── netlify.toml                  # Konfigurasi build Netlify, SPA redirect 200, & header OWASP
-├── package.json                  # Dependensi dan skrip build/lint/dev
-└── vite.config.ts                # Konfigurasi Vite, chunk splitting, dan Workbox PWA
+│   │   ├── 3d/                   # Engine 3D Three.js, diorama 13 klaster, & resource tracker
+│   │   ├── tabs/                 # HomeTab, LectureTab, Lab3DTab, ExamTab, OsDiskTab
+│   │   └── ui/                   # PillNav, MobileBottomDock, Toast, PWAInstallButton
+│   ├── data/                     # curriculumData, extraCurriculumData, theaterDirector*, examBankData
+│   ├── hooks/                    # useSpeechLecture, useProgressStore, useExamTimer, useReducedMotion
+│   ├── server/
+│   │   └── ttsService.ts         # Layanan Gemini TTS bersama (Express & Netlify Function)
+│   ├── types/rigbench.ts         # Definisi tipe TypeScript aplikasi
+│   └── utils/                    # deviceTier, waveformSync, subtitleCues, ttsAudioCache, rubricMatcher
+├── .env.example                  # Contoh variabel lingkungan server (tanpa secret)
+├── .gitleaks.toml                # Aturan allowlist Gitleaks
+├── .gitignore                    # Mengecualikan node_modules, dist, .env*, .tts-cache, public/assets/aistudio
+├── netlify.toml                  # Build Vite, esbuild functions, routing /api/tts/* & header OWASP
+├── server.ts                     # Full-stack server lokal port 3000 (dev & production)
+└── vite.config.ts                # Konfigurasi Vite, Workbox PWA, & chunk splitting
 ```
 
 ---
 
 ## Keamanan & Kesiapan Deploy
 
-- **Kepatuhan Keamanan (OWASP Top 10:2025):**
-  - Header keamanan aktif di `netlify.toml`: `Content-Security-Policy` ketat, `Strict-Transport-Security`, `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, dan `Permissions-Policy`.
-  - Sanitasi seluruh input pengguna (`src/utils/inputSanitizer.ts`) untuk mencegah pola XSS, kontrol panjang karakter, dan pembatasan input pencarian/essay.
-  - Validasi skema dan perlindungan *prototype pollution* pada pembacaan `localStorage` (`src/hooks/useProgressStore.ts`).
-  - Validasi unggahan file `.glb`/`.gltf` di Lab 3D maksimal **25 MB** beserta pemeriksaan header biner `glTF` (*magic bytes*).
-- **Perlindungan Kebocoran Secret (Gitleaks):**
-  - Tidak ada API key, token pribadi, atau file `.env` sensitif yang tersimpan di proyek.
-  - Workflow `.github/workflows/gitleaks.yml` otomatis memindai setiap `push` dan `pull_request` dengan konfigurasi `.gitleaks.toml`.
-  - Folder `public/assets/aistudio/`, `dist/`, `dev-dist/`, `node_modules/`, dan `.env*` (kecuali `.env.example`) sudah dikecualikan di `.gitignore`.
+- **Kepatuhan Keamanan (OWASP Top 10:2025):** Header keamanan di `netlify.toml` (`Content-Security-Policy`, `HSTS`, `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`), sanitasi input (`src/utils/inputSanitizer.ts`), proteksi `localStorage`, dan validasi berkas `.glb`/`.gltf` maks 25 MB.
+- **API Key Sisi Server Only:** `GEMINI_API_KEY` hanya dibaca di `src/server/ttsService.ts` (server `server.ts` atau Netlify Function `netlify/functions/tts.mts`), tidak pernah diekspos ke klien atau diawali `VITE_`.
+- **Perlindungan Git & Secret:** `.env*` (kecuali `.env.example`), `.tts-cache/`, dan `public/assets/aistudio/` sudah masuk `.gitignore`, serta `.github/workflows/gitleaks.yml` memindai setiap `push` dan `pull_request`.
 
 ---
 
-## Menjalankan Secara Lokal & Deploy
+## Menjalankan Lokal & Deploy Otomatis GitHub → Netlify
 
-### Prasyarat
-- **Node.js 20+** dan **npm** (atau **Bun**)
-
-### Perintah Pengembangan & Build
+### 1. Menjalankan Secara Lokal
+- Prasyarat: **Node.js 22+** dan **npm**
 ```bash
-# 1. Pasang dependensi
+# Pasang dependensi
 npm install
 
-# 2. Jalankan development server (port 3000)
+# Salin contoh env lalu isi GEMINI_API_KEY (opsional; tanpa key tetap jalan dengan suara lokal)
+cp .env.example .env
+
+# Jalankan full-stack server dev (port 3000: Vite + /api/tts)
 npm run dev
 
-# 3. Verifikasi tipe TypeScript ketat
+# Verifikasi tipe TypeScript & build produksi
 npm run lint
-
-# 4. Build produksi untuk Netlify / static hosting
 npm run build
 ```
 
-### Deploy ke GitHub & Netlify
-1. Inisialisasi Git jika folder proyek belum memiliki `.git`:
+### 2. Push ke GitHub & Auto-Deploy ke Netlify
+1. Inisialisasi repository Git jika belum ada dan pastikan tidak ada file rahasia yang ter-stage:
    ```bash
    git init
    git branch -M main
    git add .
-   git status   # Pastikan tidak ada .env atau file sensitif yang ikut ter-stage
-   git commit -m "chore: initial commit RigBench production-ready"
+   git status   # Pastikan .env dan .tts-cache/ TIDAK muncul di daftar
+   git commit -m "feat: audio-subtitle sync, mobile optimization, and Netlify TTS readiness"
    ```
-2. Hubungkan ke repository GitHub dan push:
+2. Hubungkan ke GitHub dan push:
    ```bash
    git remote add origin https://github.com/<username>/<repo-rigbench>.git
    git push -u origin main
    ```
-3. Hubungkan repository GitHub tersebut di dashboard **Netlify** — pengaturan build (`npm run build`, publish directory `dist`, Node `20`, SPA redirect, dan header keamanan) akan terbaca otomatis dari `netlify.toml`.
+3. Hubungkan repository tersebut di dashboard **Netlify** (**Add new site → Import an existing project → GitHub**):
+   - Perintah build (`npm run build`), folder publish (`dist`), Node `22`, `netlify/functions`, serta routing `/api/tts/*` akan terdeteksi otomatis dari `netlify.toml`.
+   - Buka **Site configuration → Environment variables** di Netlify, tambahkan `GEMINI_API_KEY` berisi kunci Gemini API kamu, lalu lakukan **Trigger deploy → Clear cache and deploy site** agar narasi suara AI Gemini aktif langsung di domain Netlify (jika tidak diisi, aplikasi otomatis memakai suara lokal browser tanpa error).

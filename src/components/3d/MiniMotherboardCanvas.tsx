@@ -63,10 +63,14 @@ export function MiniMotherboardCanvas({
     const scene = new THREE.Scene();
     scene.background = frameless ? null : new THREE.Color(0x030814);
 
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
-    scene.environment = envRT.texture;
-    pmrem.dispose();
+    const useEnvMap = profile.effectiveTier !== 'low';
+    let envRT: THREE.WebGLRenderTarget | null = null;
+    if (useEnvMap) {
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
+      scene.environment = envRT.texture;
+      pmrem.dispose();
+    }
 
     const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
     camera.position.set(8.2, 7.6, 9.2);
@@ -83,9 +87,9 @@ export function MiniMotherboardCanvas({
     controls.autoRotateSpeed = 0.75;
     controls.update();
 
-    const hemi = new THREE.HemisphereLight(0xdbeafe, 0x02050c, 0.85);
+    const hemi = new THREE.HemisphereLight(0xdbeafe, 0x02050c, useEnvMap ? 0.85 : 1.2);
     scene.add(hemi);
-    const keyLight = new THREE.DirectionalLight(0xfff4e6, 1.55);
+    const keyLight = new THREE.DirectionalLight(0xfff4e6, useEnvMap ? 1.55 : 1.8);
     keyLight.position.set(7, 12, 8);
     if (profile.shadowsEnabled) {
       keyLight.castShadow = true;
@@ -94,7 +98,7 @@ export function MiniMotherboardCanvas({
       keyLight.shadow.bias = -0.0005;
     }
     scene.add(keyLight);
-    const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.9);
+    const rimLight = new THREE.DirectionalLight(0x38bdf8, useEnvMap ? 0.9 : 1.15);
     rimLight.position.set(-8, 6, -7);
     scene.add(rimLight);
 
@@ -231,7 +235,7 @@ export function MiniMotherboardCanvas({
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       controls.dispose();
       built.dispose();
-      envRT.dispose();
+      envRT?.dispose();
       renderer.dispose();
       if (renderer.domElement.parentNode === host) {
         host.removeChild(renderer.domElement);

@@ -28,37 +28,37 @@ export const TUTOR_PERSONAS: TutorPersonaSpec[] = [
     engine: 'gemini',
     geminiVoice: 'Kore',
     geminiStyle:
-      'Speak in natural, warm, enthusiastic Bahasa Indonesia like a young energetic university lab tutor teaching a friend. Use lively intonation, clear pauses on commas and periods, and encouraging emphasis on key exam terms without sounding robotic.',
+      'Speak in calm, warm, patient Bahasa Indonesia at a relaxed, unhurried teaching pace (slightly slower than normal conversation), like a friendly private tutor teaching a beginner. Pause clearly at every comma, period, and between math numbers or new steps so listeners have time to absorb each idea.',
   },
   {
     id: 'bima-santai',
     label: 'Kak Bima · Tutor Santai (AI)',
     shortLabel: 'Kak Bima (AI)',
-    description: 'Suara tutor pria muda yang ramah, ekspresif, asyik, dan tidak membosankan.',
+    description: 'Suara tutor pria muda yang ramah, santai, pelan, dan enak diikuti pemula.',
     engine: 'gemini',
     geminiVoice: 'Puck',
     geminiStyle:
-      'Speak in natural, friendly, upbeat Bahasa Indonesia like an approachable young tech mentor explaining PC hardware with enthusiasm and crisp pronunciation.',
+      'Speak in relaxed, friendly, unhurried Bahasa Indonesia at a calm, steady teaching tempo (slightly slower than everyday chat). Give clear gentle pauses after each sentence and before every calculation result so beginners can easily follow along.',
   },
   {
     id: 'zara-cerah',
     label: 'Kak Zara · Tutor Cerah (AI)',
     shortLabel: 'Kak Zara (AI)',
-    description: 'Suara tutor wanita dengan tempo ringan, ekspresif, dan enak didengar lama.',
+    description: 'Suara tutor wanita bertempo pelan, cerah, dan sangat jelas artikulasinya.',
     engine: 'gemini',
     geminiVoice: 'Zephyr',
     geminiStyle:
-      'Speak in bright, expressive, conversational Bahasa Indonesia like an engaging educational creator who makes complex technical topics feel easy and exciting.',
+      'Speak in bright, warm, unhurried Bahasa Indonesia at a gentle, deliberate educational pace. Pronounce every step and number clearly with comfortable breathing pauses on punctuation so complex topics feel effortless.',
   },
   {
     id: 'ardi-mentor',
     label: 'Pak Ardi · Mentor Tegas (AI)',
     shortLabel: 'Pak Ardi (AI)',
-    description: 'Suara dosen praktikum yang berwibawa, tenang, tegas, dan fokus pada poin ujian.',
+    description: 'Suara dosen praktikum yang tenang, pelan, runtut, dan fokus pada poin ujian.',
     engine: 'gemini',
     geminiVoice: 'Charon',
     geminiStyle:
-      'Speak in clear, authoritative yet supportive Bahasa Indonesia like an experienced computer architecture lecturer guiding students step-by-step for an exam.',
+      'Speak in calm, measured, clear Bahasa Indonesia at a slow, deliberate lecturer pace. Pause deliberately between numbered steps, formulas, and exam definitions so students never feel rushed.',
   },
   {
     id: 'local-browser',

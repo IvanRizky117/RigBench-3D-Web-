@@ -63,6 +63,7 @@ export default defineConfig(() => {
             '**/Lab3DTab*.js',
           ],
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+          navigateFallbackDenylist: [/^\/api\//, /^\/\.netlify\//],
           runtimeCaching: [
             {
               urlPattern: /\/assets\/.*\.(?:js|css)$/i,

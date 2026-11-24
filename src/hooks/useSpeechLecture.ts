@@ -26,11 +26,14 @@ import {
   setCachedAudioClip,
 } from '../utils/ttsAudioCache';
 import {
+  alignTimelineToWavProfile,
+  analyzeWavAudioProfile,
   buildPhoneticWordTimeline,
-  detectWavPauseBoundaries,
+  computeSpokenWordWeight,
+  type WavAudioProfile,
 } from '../utils/waveformSync';
 
-export type PlaybackSpeed = 0.75 | 1 | 1.25 | 1.5;
+export type PlaybackSpeed = 0.75 | 0.9 | 1 | 1.25 | 1.5;
 
 export type AudioEngineMode =
   | 'idle'
@@ -59,6 +62,7 @@ export interface SpeechLectureController {
   durationSec: number;
   activeWordIndex: number | null;
   wavPausePcts: number[];
+  wavAudioProfile: WavAudioProfile | null;
   speed: PlaybackSpeed;
   volume: number; // 0..1
   isMuted: boolean;
@@ -97,14 +101,53 @@ interface SentenceBlock {
 
 const PERSONA_STORAGE_KEY = 'rigbench_tts_persona_v1';
 const VOLUME_STORAGE_KEY = 'rigbench_tts_volume_v1';
+const SPEED_STORAGE_KEY = 'rigbench_tts_speed_v1';
 const DEFAULT_TTS_VOLUME = 0.68;
-const DEFAULT_BASE_CPS = 16.0;
+const DEFAULT_BASE_CPS = 14.5;
 const START_WAIT_TIMEOUT_MS = 1500;
 const TICK_INTERVAL_MS = 50;
 
-// Session-level guard: if hosted statically (e.g. Netlify SPA returning HTML for /api/tts),
-// skip repeated futile fetches and launch smooth local voice instantaneously.
-let staticHostTtsUnavailable = false;
+// Session-level guard: only locked when `/api/tts/status` explicitly confirms a static host (e.g. Netlify SPA returning HTML).
+let staticHostTtsConfirmed = false;
+
+async function confirmStaticHostWithoutTtsApi(signal: AbortSignal): Promise<boolean> {
+  if (staticHostTtsConfirmed) return true;
+  try {
+    const statusRes = await fetch('/api/tts/status', { signal });
+    const ct = statusRes.headers.get('Content-Type') ?? '';
+    if (statusRes.ok && ct.includes('application/json')) {
+      return false;
+    }
+    if (ct.includes('text/html') || statusRes.status === 404) {
+      staticHostTtsConfirmed = true;
+      return true;
+    }
+  } catch {
+    // Transient network error or abort; do not permanently latch static host
+  }
+  return false;
+}
+
+function readStoredSpeed(): PlaybackSpeed {
+  if (typeof window === 'undefined') return 1;
+  try {
+    const raw = window.localStorage.getItem(SPEED_STORAGE_KEY);
+    if (!raw) return 1;
+    const parsed = Number(raw);
+    if (
+      parsed === 0.75 ||
+      parsed === 0.9 ||
+      parsed === 1 ||
+      parsed === 1.25 ||
+      parsed === 1.5
+    ) {
+      return parsed;
+    }
+  } catch {
+    // Ignore storage read errors
+  }
+  return 1;
+}
 
 function readStoredVolume(): number {
   if (typeof window === 'undefined') return DEFAULT_TTS_VOLUME;
@@ -174,17 +217,24 @@ function buildSentenceBlocks(narration: string): SentenceBlock[] {
   const sentences = splitIntoSpeechSentences(narration);
   if (!sentences.length) return [];
 
-  const totalChars = sentences.reduce((sum, s) => sum + Math.max(1, s.length), 0);
+  const sentenceWeights = sentences.map((sentence) => {
+    const words = sentence.split(/\s+/).filter(Boolean);
+    return Math.max(
+      1,
+      words.reduce((sum, w) => sum + computeSpokenWordWeight(w), 0)
+    );
+  });
+  const totalWeight = sentenceWeights.reduce((sum, w) => sum + w, 0);
   let wordCursor = 0;
-  let charAcc = 0;
+  let weightAcc = 0;
 
   return sentences.map((sentence, idx) => {
     const words = sentence.split(/\s+/).filter(Boolean);
     const startWordIndex = wordCursor;
     const endWordIndex = wordCursor + Math.max(0, words.length - 1);
-    const startPct = (charAcc / totalChars) * 100;
-    charAcc += Math.max(1, sentence.length);
-    const endPct = idx === sentences.length - 1 ? 100 : (charAcc / totalChars) * 100;
+    const startPct = (weightAcc / totalWeight) * 100;
+    weightAcc += sentenceWeights[idx];
+    const endPct = idx === sentences.length - 1 ? 100 : (weightAcc / totalWeight) * 100;
 
     wordCursor += words.length;
     return {
@@ -237,7 +287,12 @@ export function useSpeechLecture({
   const [actualDurationSec, setActualDurationSec] = useState<number | null>(null);
   const [activeWordIndex, setActiveWordIndex] = useState<number | null>(null);
   const [wavPausePcts, setWavPausePcts] = useState<number[]>([]);
-  const [speed, setSpeedState] = useState<PlaybackSpeed>(1);
+  const [wavAudioProfile, setWavAudioProfile] = useState<WavAudioProfile | null>(null);
+  const wavProfileRef = useRef<WavAudioProfile | null>(null);
+  const alignedTimelineRef = useRef<WordTimelineEntry[] | null>(null);
+  const lastReportedPctRef = useRef<number>(-1);
+  const lastReportedWordRef = useRef<number | null>(null);
+  const [speed, setSpeedState] = useState<PlaybackSpeed>(readStoredSpeed);
   const [volume, setVolumeState] = useState<number>(readStoredVolume);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [selectedPersonaId, setSelectedPersonaIdState] = useState<TutorPersonaId>(
@@ -258,7 +313,7 @@ export function useSpeechLecture({
   const speakDelayRef = useRef<number | null>(null);
   const playbackSessionRef = useRef<number>(0);
   const progressRef = useRef<number>(0);
-  const speedRef = useRef<PlaybackSpeed>(1);
+  const speedRef = useRef<PlaybackSpeed>(speed);
   const volumeRef = useRef<number>(volume);
   const isMutedRef = useRef<boolean>(false);
   const isPlayingRef = useRef<boolean>(false);
@@ -357,6 +412,7 @@ export function useSpeechLecture({
 
   const setSelectedPersonaId = useCallback((id: TutorPersonaId) => {
     const valid = getTutorPersona(id).id;
+    fallbackNotifiedRef.current = false;
     setSelectedPersonaIdState(valid);
     try {
       window.localStorage.setItem(PERSONA_STORAGE_KEY, valid);
@@ -455,9 +511,14 @@ export function useSpeechLecture({
     cancelPlayback();
     disposeAudioElement();
     progressRef.current = 0;
+    lastReportedPctRef.current = -1;
+    lastReportedWordRef.current = null;
+    alignedTimelineRef.current = null;
     setProgress(0);
     setActiveWordIndex(null);
     setWavPausePcts([]);
+    setWavAudioProfile(null);
+    wavProfileRef.current = null;
     setAudioEngineMode('idle');
 
     if (shouldResumeAutoPlay) {
@@ -636,8 +697,9 @@ export function useSpeechLecture({
 
         const utterance = new SpeechSynthesisUtterance(spokenText);
         utterance.lang = 'id-ID';
-        utterance.rate = activeRate;
-        utterance.pitch = 1.04;
+        // Slightly calmer local Web Speech pacing so technical terms stay intelligible
+        utterance.rate = Math.max(0.6, Math.min(1.6, activeRate * 0.94));
+        utterance.pitch = 1.02;
         utterance.volume = isMutedRef.current ? 0 : volumeRef.current;
 
         const chosenVoice = selectedVoiceUri
@@ -757,7 +819,23 @@ export function useSpeechLecture({
     ) => {
       clearLocalTimers();
       const cues = buildSubtitleCues(segment.narration);
-      const timeline = buildGlobalWordTimeline(segment.narration, cues);
+      const basePhonetic = buildPhoneticWordTimeline(segment.narration);
+      const fallbackTimeline = buildGlobalWordTimeline(segment.narration, cues);
+
+      const computeActiveTimeline = (): WordTimelineEntry[] => {
+        if (wavProfileRef.current) {
+          return alignTimelineToWavProfile(basePhonetic, wavProfileRef.current).map((p) => ({
+            globalWordIndex: p.wordIndex,
+            startPct: p.startPct,
+            endPct: p.endPct,
+          }));
+        }
+        return fallbackTimeline;
+      };
+
+      alignedTimelineRef.current = computeActiveTimeline();
+      lastReportedPctRef.current = -1;
+      lastReportedWordRef.current = null;
 
       const syncFromAudio = () => {
         if (sessionId !== playbackSessionRef.current || !isPlayingRef.current) return;
@@ -765,8 +843,21 @@ export function useSpeechLecture({
         if (Number.isFinite(dur) && dur > 0) {
           const pct = Math.max(0, Math.min(100, (audio.currentTime / dur) * 100));
           progressRef.current = pct;
-          setProgress(pct);
-          setActiveWordIndex(findWordIndexAtPercent(timeline, pct));
+          if (
+            Math.abs(pct - lastReportedPctRef.current) >= 0.08 ||
+            pct === 0 ||
+            pct >= 99.9
+          ) {
+            lastReportedPctRef.current = pct;
+            setProgress(pct);
+          }
+
+          const timeline = alignedTimelineRef.current ?? fallbackTimeline;
+          const nextWord = findWordIndexAtPercent(timeline, pct);
+          if (nextWord !== lastReportedWordRef.current) {
+            lastReportedWordRef.current = nextWord;
+            setActiveWordIndex(nextWord);
+          }
         }
         if (!audio.paused && !audio.ended) {
           rafRef.current = window.requestAnimationFrame(syncFromAudio);
@@ -797,9 +888,13 @@ export function useSpeechLecture({
         if (sessionId !== playbackSessionRef.current) return;
         clearLocalTimers();
         progressRef.current = 100;
+        lastReportedPctRef.current = 100;
         setProgress(100);
+        const timeline = alignedTimelineRef.current ?? fallbackTimeline;
         if (timeline.length > 0) {
-          setActiveWordIndex(timeline[timeline.length - 1].globalWordIndex);
+          const lastWord = timeline[timeline.length - 1].globalWordIndex;
+          lastReportedWordRef.current = lastWord;
+          setActiveWordIndex(lastWord);
         }
         isPlayingRef.current = false;
         setIsPlaying(false);
@@ -831,9 +926,25 @@ export function useSpeechLecture({
           if (sessionId !== playbackSessionRef.current || !isPlayingRef.current) return;
           rafRef.current = window.requestAnimationFrame(syncFromAudio);
         })
-        .catch(() => {
+        .catch((playErr: unknown) => {
           if (sessionId !== playbackSessionRef.current) return;
           clearLocalTimers();
+          const errName = playErr instanceof Error ? playErr.name : '';
+          const errMsg = playErr instanceof Error ? playErr.message : '';
+          const isAutoplayBlocked =
+            errName === 'NotAllowedError' ||
+            /notallowed|autoplay|gesture/i.test(errMsg);
+
+          if (isAutoplayBlocked) {
+            // Preserve the loaded Gemini WAV and let the user tap Play instead of replacing AI voice with local TTS!
+            isPlayingRef.current = false;
+            setIsPlaying(false);
+            setAudioEngineMode(mode);
+            onFallbackNoticeRef.current?.(
+              'Browser menahan putar otomatis. Ketuk tombol Putar untuk melanjutkan suara AI.'
+            );
+            return;
+          }
           startLocalFallbackFrom(startPercent, rate);
         });
     },
@@ -884,23 +995,25 @@ export function useSpeechLecture({
       if (sessionId !== playbackSessionRef.current) return;
 
       if (cachedBlob) {
+        // Compute PCM16 WAV pause profile BEFORE playback starts (<5ms, zero AudioContext)
+        const profile = await analyzeWavAudioProfile(cachedBlob);
+        if (sessionId !== playbackSessionRef.current) return;
+        wavProfileRef.current = profile;
+        setWavAudioProfile(profile);
+        setWavPausePcts(profile ? profile.pauses.map((p) => p.pct) : []);
+
         disposeAudioElement();
         const url = URL.createObjectURL(cachedBlob);
         const audio = new Audio(url);
         activeObjectUrlRef.current = url;
         audioElRef.current = audio;
         loadedAudioKeyRef.current = cacheKey;
-        void detectWavPauseBoundaries(cachedBlob).then((pauses) => {
-          if (sessionId === playbackSessionRef.current) {
-            setWavPausePcts(pauses);
-          }
-        });
         playGeminiAudioElement(audio, segment, startPercent, activeRate, 'gemini-cached', sessionId);
         return;
       }
 
-      // Tier 2: Fetch from server `/api/tts` (skip immediately if static hosting already detected)
-      if (staticHostTtsUnavailable) {
+      // Tier 2: Fetch from server `/api/tts` (skip only if `/api/tts/status` confirmed static hosting)
+      if (staticHostTtsConfirmed) {
         startLocalFallbackFrom(startPercent, activeRate, wordIndexOverride);
         return;
       }
@@ -912,16 +1025,18 @@ export function useSpeechLecture({
 
       try {
         const res = await fetch(
-          `/api/tts/${encodeURIComponent(segment.id)}/${encodeURIComponent(persona.id)}`,
+          `/api/tts/${encodeURIComponent(segment.id)}/${encodeURIComponent(persona.id)}?v=${encodeURIComponent(clientHash)}`,
           { signal: controller.signal }
         );
 
         const contentType = res.headers.get('Content-Type') ?? '';
         if (!res.ok || !contentType.includes('audio')) {
           if (contentType.includes('text/html') || res.status === 404) {
-            staticHostTtsUnavailable = true;
+            await confirmStaticHostWithoutTtsApi(controller.signal);
           }
-          let errMsg = 'Mode hosting static terdeteksi; memakai suara lokal perangkat.';
+          let errMsg = staticHostTtsConfirmed
+            ? 'Mode hosting static terdeteksi; memakai suara lokal perangkat.'
+            : 'Gagal memuat suara AI sementara; memakai suara lokal untuk segmen ini.';
           try {
             const payload = (await res.json()) as { error?: string };
             if (payload?.error) errMsg = payload.error;
@@ -936,11 +1051,11 @@ export function useSpeechLecture({
         if (sessionId !== playbackSessionRef.current || controller.signal.aborted) return;
 
         void setCachedAudioClip(cacheKey, wavBlob);
-        void detectWavPauseBoundaries(wavBlob).then((pauses) => {
-          if (sessionId === playbackSessionRef.current) {
-            setWavPausePcts(pauses);
-          }
-        });
+        const profile = await analyzeWavAudioProfile(wavBlob);
+        if (sessionId !== playbackSessionRef.current || controller.signal.aborted) return;
+        wavProfileRef.current = profile;
+        setWavAudioProfile(profile);
+        setWavPausePcts(profile ? profile.pauses.map((p) => p.pct) : []);
 
         disposeAudioElement();
         const url = URL.createObjectURL(wavBlob);
@@ -1021,6 +1136,11 @@ export function useSpeechLecture({
     (rate: PlaybackSpeed) => {
       setSpeedState(rate);
       speedRef.current = rate;
+      try {
+        window.localStorage.setItem(SPEED_STORAGE_KEY, String(rate));
+      } catch {
+        // Ignore storage restrictions
+      }
       if (audioElRef.current && loadedAudioKeyRef.current) {
         audioElRef.current.playbackRate = rate;
         setPreservesPitch(audioElRef.current, true);
@@ -1038,10 +1158,14 @@ export function useSpeechLecture({
       const clamped = Math.max(0, Math.min(100, percent));
       const segment = segments[activeIndex];
       const cues = segment ? buildSubtitleCues(segment.narration) : [];
-      const timeline = segment ? buildGlobalWordTimeline(segment.narration, cues) : [];
+      const timeline =
+        alignedTimelineRef.current ??
+        (segment ? buildGlobalWordTimeline(segment.narration, cues) : []);
       const wordIdx = findWordIndexAtPercent(timeline, clamped);
 
       progressRef.current = clamped;
+      lastReportedPctRef.current = clamped;
+      lastReportedWordRef.current = wordIdx;
       setProgress(clamped);
       setActiveWordIndex(wordIdx);
 
@@ -1065,13 +1189,16 @@ export function useSpeechLecture({
       const segment = segments[activeIndex];
       if (!segment) return;
       const cues = buildSubtitleCues(segment.narration);
-      const timeline = buildGlobalWordTimeline(segment.narration, cues);
+      const timeline =
+        alignedTimelineRef.current ?? buildGlobalWordTimeline(segment.narration, cues);
       const entry = timeline.find((t) => t.globalWordIndex === wordIndex);
       const targetCue =
         cues.find((c) => wordIndex >= c.startWordIndex && wordIndex <= c.endWordIndex) ?? cues[0];
       const pct = entry ? entry.startPct : targetCue ? targetCue.startPct : 0;
 
       progressRef.current = pct;
+      lastReportedPctRef.current = pct;
+      lastReportedWordRef.current = wordIndex;
       setProgress(pct);
       setActiveWordIndex(wordIndex);
 
@@ -1116,6 +1243,7 @@ export function useSpeechLecture({
     durationSec,
     activeWordIndex,
     wavPausePcts,
+    wavAudioProfile,
     speed,
     volume,
     isMuted,

@@ -8,8 +8,9 @@ import {
   Play,
   SquaresFour,
 } from '@phosphor-icons/react';
+import { getClusterTrack } from '../../data/curriculumData';
 import { ABC_QUESTIONS, ESSAY_QUESTIONS } from '../../data/examBankData';
-import type { ExamAttemptSummary, ToastVariant } from '../../types/rigbench';
+import type { ClusterId, ExamAttemptSummary, ToastVariant, TryOutScope } from '../../types/rigbench';
 import { evaluateFullTryOut } from '../../utils/rubricMatcher';
 import { MAX_ESSAY_CHARS, sanitizeUserText } from '../../utils/inputSanitizer';
 import { formatCountdown, formatShortDate, getGradeLabel } from '../../utils/formatters';
@@ -31,6 +32,21 @@ type TryOutPhase = 'setup' | 'running' | 'results';
 
 const DURATION_PRESETS = [30, 45, 60, 90];
 
+const TRYOUT_SCOPES: Array<{ id: TryOutScope; label: string; shortDesc: string }> = [
+  { id: 'all', label: 'Semua Materi', shortDesc: 'Praktikum PC + Arsitektur + Sejarah PC' },
+  { id: 'praktikum', label: 'Praktikum PC', shortDesc: '7 klaster hardware, PSU, storage & EULA' },
+  { id: 'arsitektur', label: 'Arsitektur Komputer', shortDesc: 'Modul 1: 5 Unit, Bus, OS, Pipeline & Paralel' },
+  { id: 'sejarah', label: 'Sejarah PC', shortDesc: 'Modul 6: Tokoh, 5 Gen HW, Klasifikasi & 4 Era SW' },
+  { id: 'theory', label: 'Teori (Modul 1 & 6)', shortDesc: 'Gabungan Arsitektur Komputer + Sejarah PC' },
+];
+
+function matchesTryOutScope(clusterId: ClusterId, scope: TryOutScope): boolean {
+  if (scope === 'all') return true;
+  const track = getClusterTrack(clusterId);
+  if (scope === 'theory') return track === 'arsitektur' || track === 'sejarah';
+  return track === scope;
+}
+
 export function ExamTab({
   examHistory,
   masteredGlossaryIds,
@@ -40,6 +56,7 @@ export function ExamTab({
 }: ExamTabProps) {
   const [subTab, setSubTab] = useState<ExamSubTab>('tryout');
   const [phase, setPhase] = useState<TryOutPhase>('setup');
+  const [tryOutScope, setTryOutScope] = useState<TryOutScope>('all');
   const [durationMinutes, setDurationMinutes] = useState<number>(60);
   const [customMinutesInput, setCustomMinutesInput] = useState<string>('60');
   const [essayAnswers, setEssayAnswers] = useState<Record<string, string>>({});
@@ -50,17 +67,32 @@ export function ExamTab({
   const [confirmingFinish, setConfirmingFinish] = useState(false);
   const [latestAttempt, setLatestAttempt] = useState<ExamAttemptSummary | null>(null);
 
-  const allQuestions = useMemo(() => [...ESSAY_QUESTIONS, ...ABC_QUESTIONS], []);
+  const scopedEssays = useMemo(
+    () => ESSAY_QUESTIONS.filter((q) => matchesTryOutScope(q.clusterId, tryOutScope)),
+    [tryOutScope]
+  );
+  const scopedAbcs = useMemo(
+    () => ABC_QUESTIONS.filter((q) => matchesTryOutScope(q.clusterId, tryOutScope)),
+    [tryOutScope]
+  );
+  const allQuestions = useMemo(() => [...scopedEssays, ...scopedAbcs], [scopedEssays, scopedAbcs]);
+  const activeScopeMeta =
+    TRYOUT_SCOPES.find((s) => s.id === tryOutScope) ?? TRYOUT_SCOPES[0];
 
   const finishTryOut = (expiredByTimer = false) => {
-    const attempt = evaluateFullTryOut({
-      essayQuestions: ESSAY_QUESTIONS,
-      abcQuestions: ABC_QUESTIONS,
+    const evaluated = evaluateFullTryOut({
+      essayQuestions: scopedEssays,
+      abcQuestions: scopedAbcs,
       essayAnswers,
       abcAnswers,
       durationMinutes,
       elapsedSeconds: timer.elapsedSeconds,
     });
+    const attempt: ExamAttemptSummary = {
+      ...evaluated,
+      scope: tryOutScope,
+      scopeLabel: activeScopeMeta.label,
+    };
     setLatestAttempt(attempt);
     setPhase('results');
     setConfirmingFinish(false);
@@ -68,7 +100,7 @@ export function ExamTab({
     onRecordExamAttempt(attempt);
     onNotify(
       expiredByTimer ? 'Waktu Try Out Habis' : 'Analisis Rubrik Selesai',
-      `Skor Try Out: ${attempt.totalScore}/100 (Essay ${attempt.essayScorePercent}% · ABC ${attempt.abcScorePercent}%).`,
+      `Skor ${activeScopeMeta.label}: ${attempt.totalScore}/100 (Essay ${attempt.essayScorePercent}% · ABC ${attempt.abcScorePercent}%).`,
       attempt.totalScore >= 70 ? 'success' : 'info'
     );
   };
@@ -95,10 +127,10 @@ export function ExamTab({
   };
 
   const answeredCount = useMemo(() => {
-    const essayDone = ESSAY_QUESTIONS.filter((q) => (essayAnswers[q.id] ?? '').trim().length >= 5).length;
-    const abcDone = ABC_QUESTIONS.filter((q) => Boolean(abcAnswers[q.id])).length;
+    const essayDone = scopedEssays.filter((q) => (essayAnswers[q.id] ?? '').trim().length >= 5).length;
+    const abcDone = scopedAbcs.filter((q) => Boolean(abcAnswers[q.id])).length;
     return essayDone + abcDone;
-  }, [essayAnswers, abcAnswers]);
+  }, [scopedEssays, scopedAbcs, essayAnswers, abcAnswers]);
 
   const activeQuestion = allQuestions[activeIndex] ?? allQuestions[0];
 
@@ -157,22 +189,45 @@ export function ExamTab({
                 <div>
                   <h2 className="text-base font-medium text-[#F8FAFC]">Mulai Simulasi Berwaktu</h2>
                   <p className="mt-1 text-xs leading-relaxed text-[#94A3B8]">
-                    Semua jawaban Essay dikoreksi otomatis di browser berdasarkan kata kunci konsep
-                    STMIK AKI &amp; EULA/Crack.
+                    Pilih cakupan paket materi terlebih dahulu. Semua jawaban Essay dikoreksi otomatis di browser berdasarkan kata kunci konsep (tanpa hitungan rumus untuk Modul 1 &amp; 6).
                   </p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-[#94A3B8]">Cakupan Paket Try Out</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TRYOUT_SCOPES.map((sc) => {
+                      const active = tryOutScope === sc.id;
+                      return (
+                        <button
+                          key={sc.id}
+                          type="button"
+                          onClick={() => setTryOutScope(sc.id)}
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors press-feedback ${
+                            active
+                              ? 'border-[#38BDF8] bg-[#2563EB]/25 text-[#38BDF8]'
+                              : 'border-[#3B82F6]/15 bg-[#040812] text-[#94A3B8] hover:text-[#F8FAFC]'
+                          }`}
+                        >
+                          {sc.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-[#64748B]">{activeScopeMeta.shortDesc}</p>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3 border-y border-[#3B82F6]/15 py-4 text-center sm:text-left">
                   <div>
                     <p className="text-[11px] text-[#94A3B8]">Essay</p>
                     <p className="mt-0.5 font-mono text-base font-semibold text-[#38BDF8] tabular-nums">
-                      {ESSAY_QUESTIONS.length} · 70%
+                      {scopedEssays.length} · 70%
                     </p>
                   </div>
                   <div>
                     <p className="text-[11px] text-[#94A3B8]">Pilihan Ganda</p>
                     <p className="mt-0.5 font-mono text-base font-semibold text-[#F8FAFC] tabular-nums">
-                      {ABC_QUESTIONS.length} · 30%
+                      {scopedAbcs.length} · 30%
                     </p>
                   </div>
                   <div>
@@ -257,6 +312,7 @@ export function ExamTab({
                       >
                         <div>
                           <p className="text-xs font-medium text-[#F8FAFC]">
+                            {item.scopeLabel ? `${item.scopeLabel} · ` : ''}
                             {formatShortDate(item.completedAtIso)}
                           </p>
                           <p className="mt-0.5 text-[11px] text-[#94A3B8] tabular-nums">
@@ -377,7 +433,7 @@ export function ExamTab({
                                   : 'border-[#3B82F6]/15 bg-[#040812] text-[#94A3B8]'
                           }`}
                         >
-                          {isEssay ? `E${idx + 1}` : `P${idx - ESSAY_QUESTIONS.length + 1}`}
+                          {isEssay ? `E${idx + 1}` : `P${idx - scopedEssays.length + 1}`}
                         </button>
                       );
                     })}
@@ -392,7 +448,7 @@ export function ExamTab({
                     <span className="font-mono font-semibold text-[#38BDF8]">
                       {activeQuestion.type === 'essay'
                         ? `ESSAY #${activeIndex + 1} (70%)`
-                        : `PILIHAN GANDA #${activeIndex - ESSAY_QUESTIONS.length + 1} (30%)`}
+                        : `PILIHAN GANDA #${activeIndex - scopedEssays.length + 1} (30%)`}
                     </span>
                     <span className="mx-2 text-[#475569]">·</span>
                     <span className="text-[#94A3B8]">{activeQuestion.topicTag}</span>

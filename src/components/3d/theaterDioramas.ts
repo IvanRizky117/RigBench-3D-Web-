@@ -117,7 +117,7 @@ function createAccurateRamStick(
  * CLUSTER 2 · SUB-BAB 1: 3D RAM Notch Comparison (SDRAM 2-Notch vs DDR1/DDR2/DDR3) + ROM BIOS
  */
 export function buildRamDiorama(maxAniso: number, textureScale: number): BuiltTheaterDiorama {
-  const tracker = new DioramaResourceTracker();
+  const tracker = new DioramaResourceTracker(textureScale);
   const rootGroup = new THREE.Group();
   addStudioWorkbench(tracker, rootGroup, maxAniso, textureScale);
 
@@ -232,7 +232,7 @@ export function buildRamDiorama(maxAniso: number, textureScale: number): BuiltTh
  * CLUSTER 2 · SUB-BAB 2: Macro LGA 775 Socket + Gold Pins + Intel vs AMD Pedestal
  */
 export function buildCpuDiorama(maxAniso: number, textureScale: number): BuiltTheaterDiorama {
-  const tracker = new DioramaResourceTracker();
+  const tracker = new DioramaResourceTracker(textureScale);
   const rootGroup = new THREE.Group();
   addStudioWorkbench(tracker, rootGroup, maxAniso, textureScale);
 
@@ -414,7 +414,7 @@ export function buildCpuDiorama(maxAniso: number, textureScale: number): BuiltTh
  * CLUSTER 3 · SUB-BAB 1: SMPS PSU (EMI Metal Casing + Fan + Grounding + ATX 24-Pin Jumper + Stavolt/UPS)
  */
 export function buildPsuDiorama(maxAniso: number, textureScale: number): BuiltTheaterDiorama {
-  const tracker = new DioramaResourceTracker();
+  const tracker = new DioramaResourceTracker(textureScale);
   const rootGroup = new THREE.Group();
   addStudioWorkbench(tracker, rootGroup, maxAniso, textureScale);
 
@@ -642,7 +642,7 @@ export function buildPsuDiorama(maxAniso: number, textureScale: number): BuiltTh
  * CLUSTER 4 · SUB-BAB 1: Open-Lid 3.5" HDD (Spinning Platter + Moving Head) + IDE 40-Wire vs SATA 3
  */
 export function buildHddDiorama(maxAniso: number, textureScale: number): BuiltTheaterDiorama {
-  const tracker = new DioramaResourceTracker();
+  const tracker = new DioramaResourceTracker(textureScale);
   const rootGroup = new THREE.Group();
   addStudioWorkbench(tracker, rootGroup, maxAniso, textureScale);
 
@@ -817,7 +817,7 @@ export function buildHddDiorama(maxAniso: number, textureScale: number): BuiltTh
  * CLUSTER 6 · SUB-BAB 1: 4-Band Resistor (1000Ω ±10%), Ceramic Cap 103, ELCO & Analog Multitester
  */
 export function buildElectronicsDiorama(maxAniso: number, textureScale: number): BuiltTheaterDiorama {
-  const tracker = new DioramaResourceTracker();
+  const tracker = new DioramaResourceTracker(textureScale);
   const rootGroup = new THREE.Group();
   addStudioWorkbench(tracker, rootGroup, maxAniso, textureScale);
 

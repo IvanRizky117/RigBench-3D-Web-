@@ -464,6 +464,210 @@ function LegalCyberMicro({ microKey, accentColor }: { microKey: string; accentCo
   );
 }
 
+function ArchFlowMicro({ microKey, accentColor }: { microKey: string; accentColor: string }) {
+  if (microKey === 'arch-mp' || microKey === 'arch-mc' || microKey === 'arch-parallel') {
+    const isMp = microKey === 'arch-mp' || microKey === 'arch-parallel';
+    const isMc = microKey === 'arch-mc' || microKey === 'arch-parallel';
+    return (
+      <div className="grid grid-cols-2 gap-1.5 text-[10px]" aria-label="Perbandingan arsitektur paralel">
+        <div
+          className="rounded border px-2 py-1.5"
+          style={{
+            borderColor: isMp ? `${accentColor}75` : 'rgba(255,255,255,0.08)',
+            backgroundColor: isMp ? `${accentColor}16` : 'rgba(255,255,255,0.02)',
+          }}
+        >
+          <div className="font-mono font-bold text-[#E2E8F0]">Multiprosesor</div>
+          <div className="text-[9px] text-[#94A3B8]">Shared-Memory</div>
+        </div>
+        <div
+          className="rounded border px-2 py-1.5"
+          style={{
+            borderColor: isMc ? `${accentColor}75` : 'rgba(255,255,255,0.08)',
+            backgroundColor: isMc ? `${accentColor}16` : 'rgba(255,255,255,0.02)',
+          }}
+        >
+          <div className="font-mono font-bold text-[#E2E8F0]">Multikomputer</div>
+          <div className="text-[9px] text-[#94A3B8]">Message-Passing</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (microKey === 'arch-pipe' || microKey === 'arch-super' || microKey === 'arch-perf' || microKey === 'arch-risc' || microKey === 'arch-spec') {
+    const stages = [
+      { id: 'arch-perf', label: 'T=(N×S)/R', sub: 'N · S · R' },
+      { id: 'arch-pipe', label: 'Pipeline', sub: 'S ≈ 1' },
+      { id: 'arch-super', label: 'Superscalar', sub: 'S < 1' },
+      { id: 'arch-spec', label: 'SPEC', sub: 'App Riil' },
+    ];
+    return (
+      <div className="grid grid-cols-4 gap-1" aria-label="Indikator performa prosesor">
+        {stages.map((st) => {
+          const active = microKey === st.id || (microKey === 'arch-risc' && st.id === 'arch-pipe');
+          return (
+            <div
+              key={st.id}
+              className="rounded border px-1 py-1 text-center"
+              style={{
+                borderColor: active ? `${accentColor}78` : 'rgba(255,255,255,0.08)',
+                backgroundColor: active ? `${accentColor}1A` : 'rgba(255,255,255,0.02)',
+              }}
+            >
+              <div className="truncate font-mono text-[8.5px] font-bold" style={{ color: active ? accentColor : '#94A3B8' }}>
+                {st.label}
+              </div>
+              <div className="truncate text-[8px] text-[#CBD5E1]">{st.sub}</div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  const nodes = [
+    { id: 'arch-input', label: 'Input' },
+    { id: 'arch-memory', label: 'Memori' },
+    { id: 'arch-alu', label: 'ALU·Reg' },
+    { id: 'arch-buffer', label: 'Buffer' },
+    { id: 'arch-control', label: 'Kontrol' },
+  ];
+  return (
+    <div className="grid grid-cols-5 gap-1" aria-label="Diagram 5 unit fungsional dan buffer">
+      {nodes.map((n) => {
+        const active =
+          microKey === n.id ||
+          microKey === 'arch-units' ||
+          microKey === 'arch-bus' ||
+          microKey === 'arch-multibus' ||
+          (microKey === 'arch-os' && n.id === 'arch-control') ||
+          (microKey === 'arch-t0t5' && n.id === 'arch-memory') ||
+          (microKey === 'arch-multi' && n.id === 'arch-buffer');
+        return (
+          <div
+            key={n.id}
+            className="rounded border px-1 py-1 text-center"
+            style={{
+              borderColor: active ? `${accentColor}75` : 'rgba(255,255,255,0.08)',
+              backgroundColor: active ? `${accentColor}18` : 'rgba(255,255,255,0.02)',
+            }}
+          >
+            <div className="truncate font-mono text-[8px] font-bold" style={{ color: active ? accentColor : '#94A3B8' }}>
+              {n.label}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function HistoryMuseumMicro({ microKey, accentColor }: { microKey: string; accentColor: string }) {
+  if (microKey.startsWith('hist-gen') || microKey === 'hist-edvac') {
+    const gens = [
+      { id: 'hist-gen1', label: 'G1', sub: 'Vakum' },
+      { id: 'hist-gen2', label: 'G2', sub: 'Transistor' },
+      { id: 'hist-gen3', label: 'G3', sub: 'IC · OS' },
+      { id: 'hist-gen4', label: 'G4', sub: 'VLSI' },
+      { id: 'hist-gen5', label: 'G5', sub: 'AI' },
+    ];
+    return (
+      <div className="grid grid-cols-5 gap-1" aria-label="Linimasa 5 generasi komputer">
+        {gens.map((g) => {
+          const active = microKey === g.id || (microKey === 'hist-edvac' && g.id === 'hist-gen1');
+          return (
+            <div
+              key={g.id}
+              className="rounded border px-1 py-1 text-center"
+              style={{
+                borderColor: active ? `${accentColor}80` : 'rgba(255,255,255,0.08)',
+                backgroundColor: active ? `${accentColor}1C` : 'rgba(255,255,255,0.02)',
+              }}
+            >
+              <div className="font-mono text-[9px] font-bold" style={{ color: active ? accentColor : '#94A3B8' }}>
+                {g.label}
+              </div>
+              <div className="truncate text-[7.5px] text-[#CBD5E1]">{g.sub}</div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (microKey.startsWith('hist-sw')) {
+    const eras = [
+      { id: 'hist-sw1', label: 'Pioner', sub: '1950-an' },
+      { id: 'hist-sw2', label: 'Stabil', sub: '1960–70' },
+      { id: 'hist-sw3', label: 'Mikro', sub: '1980-an' },
+      { id: 'hist-sw4', label: 'Modern', sub: '1990+' },
+    ];
+    return (
+      <div className="grid grid-cols-4 gap-1" aria-label="4 era perkembangan software">
+        {eras.map((e) => {
+          const active = microKey === e.id;
+          return (
+            <div
+              key={e.id}
+              className="rounded border px-1 py-1 text-center"
+              style={{
+                borderColor: active ? `${accentColor}80` : 'rgba(255,255,255,0.08)',
+                backgroundColor: active ? `${accentColor}1C` : 'rgba(255,255,255,0.02)',
+              }}
+            >
+              <div className="font-mono text-[8.5px] font-bold" style={{ color: active ? accentColor : '#94A3B8' }}>
+                {e.label}
+              </div>
+              <div className="truncate text-[7.5px] text-[#CBD5E1]">{e.sub}</div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  const milestones =
+    microKey === 'hist-elements' || microKey === 'hist-data' || microKey === 'hist-form'
+      ? [
+          { id: 'hist-elements', label: '3 Elemen', sub: 'HW·SW·BW' },
+          { id: 'hist-data', label: 'Data', sub: 'An·Dig·Hyb' },
+          { id: 'hist-form', label: 'Fisik', sub: 'Tower–Palm' },
+        ]
+      : [
+          { id: 'hist-abacus', label: 'Manual', sub: 'Abacus' },
+          { id: 'hist-pascal', label: 'Mekanik', sub: 'Pascaline' },
+          { id: 'hist-babbage', label: 'Uap/Kartu', sub: 'Babbage' },
+          { id: 'hist-boolean', label: 'Listrik', sub: 'Boolean' },
+        ];
+
+  return (
+    <div
+      className={`grid gap-1 ${milestones.length === 3 ? 'grid-cols-3' : 'grid-cols-4'}`}
+      aria-label="Linimasa museum sejarah komputer"
+    >
+      {milestones.map((m) => {
+        const active =
+          microKey === m.id || (microKey === 'hist-hollerith' && m.id === 'hist-babbage');
+        return (
+          <div
+            key={m.id}
+            className="rounded border px-1 py-1 text-center"
+            style={{
+              borderColor: active ? `${accentColor}78` : 'rgba(255,255,255,0.08)',
+              backgroundColor: active ? `${accentColor}1A` : 'rgba(255,255,255,0.02)',
+            }}
+          >
+            <div className="truncate font-mono text-[8.5px] font-bold" style={{ color: active ? accentColor : '#94A3B8' }}>
+              {m.label}
+            </div>
+            <div className="truncate text-[7.5px] text-[#CBD5E1]">{m.sub}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function TheaterCardMicroVisual({
   variant,
   microKey,
@@ -486,5 +690,9 @@ export function TheaterCardMicroVisual({
       return <ElectronicsMicro microKey={microKey} accentColor={accentColor} />;
     case 'legal-cyber':
       return <LegalCyberMicro microKey={microKey} accentColor={accentColor} />;
+    case 'arch-flow':
+      return <ArchFlowMicro microKey={microKey} accentColor={accentColor} />;
+    case 'history-museum':
+      return <HistoryMuseumMicro microKey={microKey} accentColor={accentColor} />;
   }
 }

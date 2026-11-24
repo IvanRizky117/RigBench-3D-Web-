@@ -16,6 +16,8 @@ const CATEGORIES: Array<'Semua' | GlossaryItem['category']> = [
   'Kelistrikan',
   'Partisi & File System',
   'EULA & Keamanan Siber',
+  'Arsitektur & Performa',
+  'Sejarah & Klasifikasi',
 ];
 
 export function GlossaryFlashcards({ masteredIds, onToggleMastered }: GlossaryFlashcardsProps) {
@@ -63,7 +65,7 @@ export function GlossaryFlashcards({ masteredIds, onToggleMastered }: GlossaryFl
             maxLength={MAX_SEARCH_CHARS}
             value={query}
             onChange={(e) => setQuery(sanitizeSearchQuery(e.target.value).value)}
-            placeholder="Cari BIOS, MBR, EULA, Loader..."
+            placeholder="Cari BIOS, Pipelining, ENIAC, SPEC, EULA..."
             className="w-full rounded-xl bg-[#070E1F] border border-[#3B82F6]/20 py-2 pr-3 pl-9 text-xs text-[#F8FAFC] placeholder-[#64748B] focus:border-[#38BDF8] focus:outline-none"
           />
         </div>

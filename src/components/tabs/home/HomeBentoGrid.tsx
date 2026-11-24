@@ -8,7 +8,8 @@ import {
   Warning,
 } from '@phosphor-icons/react';
 import { AnimatePresence, motion, useReducedMotion, type Variants } from 'framer-motion';
-import { CURRICULUM_CLUSTERS } from '../../../data/curriculumData';
+import { CURRICULUM_CLUSTERS, getClusterTrack } from '../../../data/curriculumData';
+import { ABC_QUESTIONS, ESSAY_QUESTIONS } from '../../../data/examBankData';
 import { MAINBOARD_COMPONENTS } from '../../../data/mainboardData';
 import type { ClusterId, TabId, UserProgressStore } from '../../../types/rigbench';
 import { LazyMiniMotherboard } from './LazyMiniMotherboard';
@@ -60,6 +61,9 @@ export function HomeBentoGrid({
   const [confirmingReset, setConfirmingReset] = useState(false);
 
   const completedCount = progress.completedClusters.length;
+  const praktikumDone = progress.completedClusters.filter((id) => getClusterTrack(id) === 'praktikum').length;
+  const archDone = progress.completedClusters.filter((id) => getClusterTrack(id) === 'arsitektur').length;
+  const histDone = progress.completedClusters.filter((id) => getClusterTrack(id) === 'sejarah').length;
   const inspectedCount = progress.inspectedComponents.length;
   const bestScore =
     progress.examHistory.length > 0
@@ -208,7 +212,9 @@ export function HomeBentoGrid({
 
           <div className="grid grid-cols-3 gap-2 border-t border-[#3B82F6]/15 pt-3 text-center">
             <div>
-              <p className="font-mono text-sm font-semibold text-[#F8FAFC] tabular-nums">7</p>
+              <p className="font-mono text-sm font-semibold text-[#F8FAFC] tabular-nums">
+                {CURRICULUM_CLUSTERS.length}
+              </p>
               <p className="text-[10px] text-[#94A3B8]">Klaster</p>
             </div>
             <div>
@@ -329,6 +335,9 @@ export function HomeBentoGrid({
                   {bestScore !== null ? `${bestScore}/100` : '—'}
                 </span>
               </div>
+              <p className="pt-1 border-t border-[#3B82F6]/15 font-mono text-[10px] text-[#64748B] tabular-nums">
+                Praktikum {praktikumDone}/7 · Arsitektur {archDone}/3 · Sejarah {histDone}/3
+              </p>
             </div>
           </div>
         </motion.div>
@@ -383,7 +392,7 @@ export function HomeBentoGrid({
                   <ShieldCheck size={26} weight="duotone" />
                 </div>
                 <p className="mt-2.5 text-xs text-[#94A3B8]">
-                  Koreksi otomatis 14 Essay &amp; 15 ABC langsung di browser.
+                  Koreksi otomatis {ESSAY_QUESTIONS.length} Essay &amp; {ABC_QUESTIONS.length} ABC langsung di browser.
                 </p>
               </motion.div>
             ) : (

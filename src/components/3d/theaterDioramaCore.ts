@@ -1,15 +1,40 @@
 import * as THREE from 'three';
 import { createStudioFloorTexture } from './studioMotherboardTextures';
 
+export interface TheaterStoryContext {
+  progressPct: number;
+  keyframeId: string;
+  keyframeIndex: number;
+  reducedMotion: boolean;
+}
+
+export interface TheaterStageAtmosphere {
+  backgroundHex: number;
+  fogHex: number;
+  fogNear: number;
+  fogFar: number;
+  hemiSkyHex: number;
+  hemiGroundHex: number;
+  hemiIntensity: number;
+  keyHex: number;
+  keyIntensity: number;
+  rimHex: number;
+  rimIntensity: number;
+  envIntensity: number;
+}
+
 export interface BuiltTheaterDiorama {
   rootGroup: THREE.Group;
+  stageTheme?: 'studio-dark' | 'story-bright';
+  initialAtmosphere?: TheaterStageAtmosphere;
   update: (
     elapsed: number,
     dt: number,
     mechAction: string | undefined,
     anchor: [number, number, number],
     domainColor: string,
-    isPlaying: boolean
+    isPlaying: boolean,
+    story?: TheaterStoryContext
   ) => void;
   dispose: () => void;
 }
@@ -18,6 +43,11 @@ export class DioramaResourceTracker {
   private readonly geometries: THREE.BufferGeometry[] = [];
   private readonly materials: THREE.Material[] = [];
   private readonly textures: THREE.Texture[] = [];
+  readonly textureScale: number;
+
+  constructor(textureScale = 1) {
+    this.textureScale = Math.max(0.25, Math.min(1, textureScale));
+  }
 
   geo<T extends THREE.BufferGeometry>(g: T): T {
     this.geometries.push(g);
@@ -29,7 +59,29 @@ export class DioramaResourceTracker {
     return m;
   }
 
-  tex<T extends THREE.Texture>(t: T): T {
+  tex<T extends THREE.Texture>(t: T, isDynamic = false): T {
+    if (
+      !isDynamic &&
+      this.textureScale < 0.99 &&
+      t instanceof THREE.CanvasTexture &&
+      t.image instanceof HTMLCanvasElement
+    ) {
+      const src = t.image;
+      if (src.width >= 96 && src.height >= 48) {
+        const dst = document.createElement('canvas');
+        dst.width = Math.max(64, Math.round(src.width * this.textureScale));
+        dst.height = Math.max(32, Math.round(src.height * this.textureScale));
+        const ctx = dst.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(src, 0, 0, dst.width, dst.height);
+          t.image = dst;
+          t.needsUpdate = true;
+          // Release full-res temporary canvas memory immediately
+          src.width = 0;
+          src.height = 0;
+        }
+      }
+    }
     this.textures.push(t);
     return t;
   }
